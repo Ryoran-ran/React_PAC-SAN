@@ -7,6 +7,7 @@ import { createGhosts, type Ghost } from '../entities/Ghost';
 import { GhostHouse } from '../ai/GhostHouse';
 import { ModeScheduler } from '../ai/ModeScheduler';
 import { getGhostTarget } from '../ai/Targeting';
+import { chooseAutoDirection, type AutoPlayLevel } from '../ai/AutoPlayer';
 import { Maze } from '../map/maze';
 import { moveGhost, movePlayer } from '../systems/MovementSystem';
 import { pointsForDot } from '../systems/ScoreSystem';
@@ -27,6 +28,9 @@ export class GameEngine {
   playFrame = 0;
   readyFrames = 0;
   debug = false;
+  autoPlayLevel: AutoPlayLevel | null = null;
+  autoPlayTarget: { x: number; y: number } | null = null;
+  private autoDecisionCenter: string | null = null;
   private pausedFrom: 'READY' | 'PLAYING' = 'PLAYING';
 
   constructor(highScore = 0) { this.highScore = highScore; }
@@ -42,13 +46,24 @@ export class GameEngine {
     this.frame = 0;
     this.playFrame = 0;
     this.readyFrames = READY_FRAMES;
+    this.autoPlayTarget = null;
+    this.autoDecisionCenter = null;
     this.state = 'READY';
   }
 
   requestDirection(direction: Direction): void {
     if (this.state === 'READY' || this.state === 'PLAYING' || this.state === 'PAUSED') {
+      this.setAutoPlayLevel(null);
       this.player.requestedDirection = direction;
     }
+  }
+
+  setAutoPlayLevel(level: AutoPlayLevel | null): void {
+    if (level && !this.debug) return;
+    this.autoPlayLevel = level;
+    this.autoPlayTarget = null;
+    this.autoDecisionCenter = null;
+    if (level) this.player.requestedDirection = this.player.direction;
   }
 
   togglePause(): void {
@@ -63,7 +78,10 @@ export class GameEngine {
     if (this.state === 'READY' || this.state === 'PLAYING') this.togglePause();
   }
 
-  toggleDebug(): void { this.debug = !this.debug; }
+  toggleDebug(): void {
+    this.debug = !this.debug;
+    if (!this.debug) this.setAutoPlayLevel(null);
+  }
 
   update(): void {
     if (this.state === 'TITLE' || this.state === 'PAUSED' || this.state === 'LEVEL_CLEAR') return;
@@ -79,6 +97,19 @@ export class GameEngine {
     }
     for (const ghost of this.ghosts) ghost.mode = this.modeScheduler.mode;
 
+    if (this.autoPlayLevel) {
+      if (isAtTileCenter(this.player)) {
+        const center = `${this.player.x},${this.player.y}`;
+        if (center !== this.autoDecisionCenter) {
+          const decision = chooseAutoDirection(this.player, this.ghosts, this.maze, this.autoPlayLevel);
+          if (decision) {
+            this.player.requestedDirection = decision.direction;
+            this.autoPlayTarget = decision.target;
+          }
+          this.autoDecisionCenter = center;
+        }
+      } else this.autoDecisionCenter = null;
+    }
     movePlayer(this.player);
     // Phase 1 compatibility: consume at the corridor center, not on tile entry.
     if (isAtTileCenter(this.player)) {
@@ -122,6 +153,8 @@ export class GameEngine {
         dotCounter: this.ghostHouse.dotCounter,
         idleFrames: this.ghostHouse.idleFrames,
       },
+      autoPlayLevel: this.autoPlayLevel,
+      autoPlayTarget: this.autoPlayTarget ? { ...this.autoPlayTarget } : null,
       ghosts: this.ghosts.map((ghost) => ({
         id: ghost.id,
         displayName: ghost.displayName,

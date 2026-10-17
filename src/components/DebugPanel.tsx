@@ -1,11 +1,13 @@
 import { FIXED_FPS } from '../config/constants';
 import { LEVEL_ONE } from '../config/levelTables';
 import type { GameEngine } from '../engine/GameEngine';
+import type { AutoPlayLevel } from '../ai/AutoPlayer';
 
 const shortDirection = { up: 'U', left: 'L', down: 'D', right: 'R' } as const;
 
-export function DebugPanel({ snapshot, onClose }: {
+export function DebugPanel({ snapshot, onAutoPlayChange, onClose }: {
   snapshot: ReturnType<GameEngine['snapshot']>;
+  onAutoPlayChange: (level: AutoPlayLevel | null) => void;
   onClose: () => void;
 }) {
   const { player } = snapshot;
@@ -17,6 +19,19 @@ export function DebugPanel({ snapshot, onClose }: {
     <div className="debug-heading">
       <span>ENGINE INSPECTOR</span>
       <button onClick={onClose} aria-label="デバッグ情報を閉じる"><kbd>F3</kbd> ×</button>
+    </div>
+    <div className="auto-play-control">
+      <label htmlFor="auto-play-level">自動操作</label>
+      <select id="auto-play-level" aria-label="オートプレイの操作レベル"
+        value={snapshot.autoPlayLevel ?? 'off'}
+        onChange={(event) => onAutoPlayChange(event.target.value === 'off' ? null : event.target.value as AutoPlayLevel)}>
+        <option value="off">OFF</option>
+        <option value="beginner">初心者</option>
+        <option value="standard">標準</option>
+        <option value="expert">上級</option>
+        <option value="tas">TAS</option>
+      </select>
+      <span>{snapshot.autoPlayTarget ? `→ ${snapshot.autoPlayTarget.x},${snapshot.autoPlayTarget.y}` : '目標 —'}</span>
     </div>
     <dl className="debug-summary">
       <dt>状態</dt><dd>{snapshot.state}</dd>
