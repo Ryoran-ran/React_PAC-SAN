@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { GameCanvas } from './components/GameCanvas';
 import { DebugPanel } from './components/DebugPanel';
+import { DebugDisplayControls } from './components/DebugDisplayControls';
 import { TOTAL_DOTS, type Direction } from './config/constants';
 import { GameEngine } from './engine/GameEngine';
+import type { DebugDisplayKey } from './engine/DebugDisplay';
 import type { AutoPlayLevel } from './ai/AutoPlayer';
 import { loadHighScore } from './storage/highScore';
 
@@ -25,6 +27,10 @@ export default function App() {
     engine.toggleDebug();
     setSnapshot(engine.snapshot());
   };
+  const changeDebugDisplay = (key: DebugDisplayKey, visible: boolean) => {
+    engine.setDebugDisplayOption(key, visible);
+    setSnapshot(engine.snapshot());
+  };
 
   return <div className="app-shell">
     <header className="site-header">
@@ -35,7 +41,10 @@ export default function App() {
     <main className="game-layout">
       <section className="arcade" aria-label="ゲーム画面">
         <div className="arcade-top"><span>01 <span className="muted">/ MAZE ACTION</span></span><span className="live-state"><i className={snapshot.state === 'PLAYING' ? 'active' : ''} />{STATE_LABELS[snapshot.state]}</span></div>
-        <div className="screen-bezel"><GameCanvas engine={engine} onSnapshot={setSnapshot} /></div>
+        <div className="screen-bezel">
+          <GameCanvas engine={engine} onSnapshot={setSnapshot} />
+          {snapshot.debug && <DebugDisplayControls display={snapshot.debugDisplay} onChange={changeDebugDisplay} />}
+        </div>
         <div className="arcade-bottom"><span>224 × 288 <span className="muted">PX</span></span><span>60 <span className="muted">HZ</span></span><span className="muted">CANVAS 2D</span></div>
       </section>
 

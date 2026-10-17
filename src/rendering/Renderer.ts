@@ -1,6 +1,7 @@
 import { COLORS, MAZE_COLUMNS, MAZE_OFFSET_Y, MAZE_ROWS, SCREEN_HEIGHT, SCREEN_WIDTH, TILE_CENTER, TILE_SIZE } from '../config/constants';
 import type { GameEngine } from '../engine/GameEngine';
 import { canPlayerEnter } from '../map/tileRules';
+import { visibleDebugTarget } from './DebugTarget';
 import { MazeRenderer } from './MazeRenderer';
 import { pixelText } from './PixelText';
 import { drawGhost, drawPlayer } from './SpriteRenderer';
@@ -52,28 +53,39 @@ export class Renderer {
 
   private drawDebug(engine: GameEngine): void {
     const ctx = this.context;
+    const display = engine.debugDisplay;
     ctx.save();
-    ctx.strokeStyle = '#50d7bd44';
-    ctx.lineWidth = 0.4;
-    for (let y = 0; y < MAZE_ROWS; y++) {
-      for (let x = 0; x < MAZE_COLUMNS; x++) {
-        if (canPlayerEnter(x, y)) ctx.strokeRect(x * TILE_SIZE, y * TILE_SIZE + MAZE_OFFSET_Y, TILE_SIZE, TILE_SIZE);
+    if (display.mazeGrid) {
+      ctx.strokeStyle = '#50d7bd44';
+      ctx.lineWidth = 0.4;
+      for (let y = 0; y < MAZE_ROWS; y++) {
+        for (let x = 0; x < MAZE_COLUMNS; x++) {
+          if (canPlayerEnter(x, y)) ctx.strokeRect(x * TILE_SIZE, y * TILE_SIZE + MAZE_OFFSET_Y, TILE_SIZE, TILE_SIZE);
+        }
       }
     }
-    ctx.strokeStyle = COLORS.debug;
-    const { x, y } = engine.player;
-    ctx.strokeRect(x - 2, y + MAZE_OFFSET_Y - 2, 4, 4);
+    if (display.playerCenter) {
+      ctx.strokeStyle = COLORS.debug;
+      const { x, y } = engine.player;
+      ctx.strokeRect(x - 2, y + MAZE_OFFSET_Y - 2, 4, 4);
+    }
     for (const ghost of engine.ghosts) {
-      const targetX = ghost.targetTile.x * TILE_SIZE + TILE_CENTER;
-      const targetY = ghost.targetTile.y * TILE_SIZE + TILE_CENTER + MAZE_OFFSET_Y;
-      ctx.strokeStyle = `${ghost.color}88`;
-      ctx.beginPath();
-      ctx.moveTo(ghost.x, ghost.y + MAZE_OFFSET_Y);
-      ctx.lineTo(targetX, targetY);
-      ctx.stroke();
-      ctx.strokeRect(targetX - 2.5, targetY - 2.5, 5, 5);
+      if (display.ghostTargets) {
+        const targetX = ghost.targetTile.x * TILE_SIZE + TILE_CENTER;
+        const targetY = ghost.targetTile.y * TILE_SIZE + TILE_CENTER + MAZE_OFFSET_Y;
+        const visibleTarget = visibleDebugTarget(
+          { x: ghost.x, y: ghost.y + MAZE_OFFSET_Y },
+          { x: targetX, y: targetY },
+        );
+        ctx.strokeStyle = `${ghost.color}88`;
+        ctx.beginPath();
+        ctx.moveTo(ghost.x, ghost.y + MAZE_OFFSET_Y);
+        ctx.lineTo(visibleTarget.x, visibleTarget.y);
+        ctx.stroke();
+        ctx.strokeRect(visibleTarget.x - 2.5, visibleTarget.y - 2.5, 5, 5);
+      }
 
-      if (ghost.lastDecision) {
+      if (display.directionChoices && ghost.lastDecision) {
         ctx.fillStyle = ghost.color;
         for (const direction of ghost.lastDecision.candidates) {
           const vector = { up: [0, -1], left: [-1, 0], down: [0, 1], right: [1, 0] }[direction];

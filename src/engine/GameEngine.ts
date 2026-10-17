@@ -13,6 +13,7 @@ import { moveGhost, movePlayer } from '../systems/MovementSystem';
 import { pointsForDot } from '../systems/ScoreSystem';
 import { isAtTileCenter } from './CollisionSystem';
 import type { GameState } from './GameState';
+import { DEFAULT_DEBUG_DISPLAY, type DebugDisplayKey, type DebugDisplayOptions } from './DebugDisplay';
 
 export class GameEngine {
   state: GameState = 'TITLE';
@@ -28,6 +29,7 @@ export class GameEngine {
   playFrame = 0;
   readyFrames = 0;
   debug = false;
+  debugDisplay: DebugDisplayOptions = { ...DEFAULT_DEBUG_DISPLAY };
   autoPlayLevel: AutoPlayLevel | null = null;
   autoPlayTarget: { x: number; y: number } | null = null;
   private autoDecisionCenter: string | null = null;
@@ -81,6 +83,10 @@ export class GameEngine {
   toggleDebug(): void {
     this.debug = !this.debug;
     if (!this.debug) this.setAutoPlayLevel(null);
+  }
+
+  setDebugDisplayOption(key: DebugDisplayKey, visible: boolean): void {
+    this.debugDisplay[key] = visible;
   }
 
   update(): void {
@@ -176,6 +182,7 @@ export class GameEngine {
         } : null,
       })),
       debug: this.debug,
+      debugDisplay: { ...this.debugDisplay },
     };
   }
 }
