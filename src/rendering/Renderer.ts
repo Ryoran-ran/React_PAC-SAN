@@ -3,7 +3,7 @@ import type { GameEngine } from '../engine/GameEngine';
 import { canPlayerEnter } from '../map/tileRules';
 import { MazeRenderer } from './MazeRenderer';
 import { pixelText } from './PixelText';
-import { drawPlayer } from './SpriteRenderer';
+import { drawGhost, drawPlayer } from './SpriteRenderer';
 
 export class Renderer {
   private maze = new MazeRenderer();
@@ -34,6 +34,7 @@ export class Renderer {
       } else ctx.fillRect(x - 1, y - 1, 2, 2);
     }
     ctx.restore();
+    for (const ghost of engine.ghosts) drawGhost(ctx, ghost);
     drawPlayer(ctx, engine.player);
     pixelText(ctx, 'ROUND 01', 8, 278, COLORS.text);
     pixelText(ctx, 'PAC-SAN', SCREEN_WIDTH - 8, 278, COLORS.player, 'right');
@@ -62,6 +63,29 @@ export class Renderer {
     ctx.strokeStyle = COLORS.debug;
     const { x, y } = engine.player;
     ctx.strokeRect(x - 2, y + MAZE_OFFSET_Y - 2, 4, 4);
+    for (const ghost of engine.ghosts) {
+      const targetX = ghost.targetTile.x * TILE_SIZE + TILE_CENTER;
+      const targetY = ghost.targetTile.y * TILE_SIZE + TILE_CENTER + MAZE_OFFSET_Y;
+      ctx.strokeStyle = `${ghost.color}88`;
+      ctx.beginPath();
+      ctx.moveTo(ghost.x, ghost.y + MAZE_OFFSET_Y);
+      ctx.lineTo(targetX, targetY);
+      ctx.stroke();
+      ctx.strokeRect(targetX - 2.5, targetY - 2.5, 5, 5);
+
+      if (ghost.lastDecision) {
+        ctx.fillStyle = ghost.color;
+        for (const direction of ghost.lastDecision.candidates) {
+          const vector = { up: [0, -1], left: [-1, 0], down: [0, 1], right: [1, 0] }[direction];
+          ctx.fillRect(
+            ghost.x + vector[0] * 5 - 0.75,
+            ghost.y + MAZE_OFFSET_Y + vector[1] * 5 - 0.75,
+            1.5,
+            1.5,
+          );
+        }
+      }
+    }
     ctx.restore();
   }
 }

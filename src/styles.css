@@ -78,10 +78,17 @@ h2 { font: 10px/1.3 Consolas, monospace; letter-spacing: 1.5px; font-weight: 400
 .debug-panel dt { color: #8eaaa5; }
 .debug-panel dd { margin: 0; font-family: Consolas, monospace; overflow-wrap: anywhere; }
 .debug-panel p { color: #91aaa5; font-size: 10px; line-height: 1.5; margin: 0; }
+.ghost-debug { width: 100%; border-collapse: collapse; table-layout: fixed; font: 9px/1.25 Consolas, monospace; }
+.ghost-debug th, .ghost-debug td { border-top: 1px solid #29433f; padding: 5px 3px; text-align: left; vertical-align: top; }
+.ghost-debug thead th { color: #73958e; font-size: 8px; letter-spacing: .6px; }
+.ghost-debug th:first-child { width: 32%; }
+.ghost-debug td small { display: block; margin-top: 2px; color: #78918c; font-size: 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.side-panel:has(.debug-panel) { gap: 10px; }
+.side-panel:has(.debug-panel) .phase-note { display: none; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; clip-path: inset(50%); white-space: nowrap; overflow: hidden; border: 0; }
 
 /* Short desktop windows retain every control with less decorative content. */
-@media (max-height: 760px) {
+@media (max-height: 800px) {
   .side-panel { gap: 12px; }
   .run-stats { padding: 10px 0; }
   .dot-count { margin: 4px 0 7px; }
@@ -97,10 +104,10 @@ h2 { font: 10px/1.3 Consolas, monospace; letter-spacing: 1.5px; font-weight: 400
   .debug-heading button { min-height: 24px; padding: 2px 6px; }
   .debug-panel dl { gap: 3px 8px; margin: 7px 0; }
   .debug-panel p { font-size: 8px; }
+  .ghost-debug th, .ghost-debug td { padding-block: 3px; }
 }
 @media (max-height: 800px) and (min-width: 681px) {
-  .side-panel:has(.debug-panel) { gap: 10px; }
-  .side-panel:has(.debug-panel) .phase-note { display: none; }
+  .side-panel:has(.debug-panel) { gap: 8px; }
 }
 @media (max-width: 960px) {
   .app-shell { padding-inline: 20px; }
@@ -147,7 +154,7 @@ h2 { font: 10px/1.3 Consolas, monospace; letter-spacing: 1.5px; font-weight: 400
   .phase-note p { margin: 0; font-size: 9px; line-height: 1.4; }
   .phase-note br { display: none; }
   .site-footer { display: none; }
-  .debug-panel { position: absolute; z-index: 2; right: 0; bottom: 0; width: min(360px, 100%); max-height: 100%; overflow: hidden; background: #101a1bf8; box-shadow: 0 12px 40px #0009; }
+  .debug-panel { position: fixed; z-index: 2; right: 12px; bottom: 8px; width: min(360px, calc(100vw - 24px)); max-height: calc(100dvh - 60px); overflow: hidden; background: #101a1bf8; box-shadow: 0 12px 40px #0009; }
 }
 
 /* Landscape phones and low desktop windows use a compact horizontal layout. */
@@ -174,5 +181,9 @@ h2 { font: 10px/1.3 Consolas, monospace; letter-spacing: 1.5px; font-weight: 400
   .debug-panel { padding: 10px 14px; font-size: 10px; }
   .debug-panel dl { gap: 4px 12px; margin: 8px 0; }
   .debug-panel p { font-size: 9px; }
+  .debug-summary dt:nth-of-type(3), .debug-summary dd:nth-of-type(3),
+  .debug-summary dt:nth-of-type(4), .debug-summary dd:nth-of-type(4),
+  .debug-summary dt:nth-of-type(5), .debug-summary dd:nth-of-type(5),
+  .debug-summary dt:nth-of-type(8), .debug-summary dd:nth-of-type(8) { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .progress-track > span { transition: none; } }

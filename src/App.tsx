@@ -17,7 +17,7 @@ export default function App() {
   return <div className="app-shell">
     <header className="site-header">
       <a className="wordmark" href="./" aria-label="PAC-SAN ホーム"><span className="pac-mark" />PAC-SAN</a>
-      <div className="edition"><span className="status-light" />PHASE 01 <span>/</span> FOUNDATION</div>
+      <div className="edition"><span className="status-light" />PHASE 02 <span>/</span> GHOST AI</div>
     </header>
 
     <main className="game-layout">
@@ -47,11 +47,11 @@ export default function App() {
           </div><p>矢印キー / WASD<span>曲がる方向は先に入力できます</span></p></div>
           <div className="debug-control"><span>デバッグ表示</span><button onClick={() => engine.toggleDebug()} aria-pressed={snapshot.debug}><kbd>F3</kbd><span>{snapshot.debug ? 'ON' : 'OFF'}</span></button></div>
         </section>
-        <div className="phase-note"><span>DEVELOPMENT BUILD</span><p>Phase 1：移動とドット取得まで実装。<br />ゴースト・残機・面進行は今後追加します。</p></div>
+        <div className="phase-note"><span>DEVELOPMENT BUILD</span><p>Phase 2：4体のゴーストAIまで実装。<br />接触・残機・面進行は今後追加します。</p></div>
         {snapshot.debug && <DebugPanel snapshot={snapshot} onClose={() => engine.toggleDebug()} />}
       </aside>
     </main>
-    <footer className="site-footer"><span>PAC-SAN <span className="muted">/ パックサン</span></span><span>1980 ARCADE RECREATION <span className="footer-divider">·</span> v0.1.0</span></footer>
+    <footer className="site-footer"><span>PAC-SAN <span className="muted">/ パックサン</span></span><span>1980 ARCADE RECREATION <span className="footer-divider">·</span> v0.2.0</span></footer>
     <div className="sr-only" role="status" aria-live="polite">{STATE_LABELS[snapshot.state]}</div>
   </div>;
 }
