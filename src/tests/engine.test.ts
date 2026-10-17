@@ -147,4 +147,22 @@ describe('Phase 1 game engine', () => {
     expect(stateA).toEqual(stateB);
     expect([...a.maze.dots]).toEqual([...b.maze.dots]);
   });
+
+  it('keeps individual debug display choices when the inspector is closed and reopened', () => {
+    const engine = new GameEngine();
+    engine.toggleDebug();
+    engine.setDebugDisplayOption('mazeGrid', false);
+    engine.setDebugDisplayOption('ghostTable', false);
+    const snapshot = engine.snapshot();
+    expect(snapshot.debugDisplay.mazeGrid).toBe(false);
+    expect(snapshot.debugDisplay.ghostTable).toBe(false);
+    expect(snapshot.debugDisplay.ghostTargets).toBe(true);
+
+    snapshot.debugDisplay.mazeGrid = true;
+    expect(engine.snapshot().debugDisplay.mazeGrid).toBe(false);
+    engine.toggleDebug();
+    engine.toggleDebug();
+    engine.start();
+    expect(engine.snapshot().debugDisplay).toMatchObject({ mazeGrid: false, ghostTable: false });
+  });
 });

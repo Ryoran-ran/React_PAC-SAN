@@ -21,7 +21,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid #ffdf00; outline-offs
 .live-state { display: flex; align-items: center; gap: 6px; white-space: nowrap; letter-spacing: 0; font-family: 'Segoe UI', 'Yu Gothic UI', sans-serif; }
 .live-state i { width: 5px; height: 5px; border-radius: 50%; background: #656671; }
 .live-state i.active { background: #a3d583; }
-.screen-bezel { min-height: 0; min-width: 0; display: flex; background: #000; border: 1px solid #25252e; border-radius: 5px; padding: 6px; }
+.screen-bezel { position: relative; min-height: 0; min-width: 0; display: flex; background: #000; border: 1px solid #25252e; border-radius: 5px; padding: 6px; }
 .canvas-viewport { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; min-width: 0; min-height: 0; }
 canvas { display: block; image-rendering: pixelated; flex-shrink: 0; }
 .arcade-bottom { padding: 10px 2px 0; font-size: 9px; line-height: 11px; letter-spacing: .5px; }
@@ -74,14 +74,33 @@ h2 { font: 10px/1.3 Consolas, monospace; letter-spacing: 1.5px; font-weight: 400
 .debug-panel { width: 100%; min-width: 0; background: #101a1b; border: 1px solid #41665f; padding: 12px 14px; border-radius: 6px; font-size: 10px; }
 .debug-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #50d7bd; font: 10px/1.4 Consolas, monospace; letter-spacing: 1px; }
 .debug-heading button { color: #b8d7d0; border: 1px solid #41665f; background: #172d29; border-radius: 4px; min-height: 28px; padding: 3px 8px; }
-.debug-panel dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 5px 10px; margin: 10px 0; line-height: 1.35; }
+.auto-play-control { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 9px; color: #a4beb8; white-space: nowrap; }
+.auto-play-control select { min-width: 0; width: 86px; padding: 3px 4px; border: 1px solid #41665f; border-radius: 3px; background: #162724; color: #e7f5ef; font: 10px 'Segoe UI', 'Yu Gothic UI', sans-serif; }
+.auto-play-control > span { overflow: hidden; text-overflow: ellipsis; font: 9px Consolas, monospace; color: #50d7bd; }
+.debug-panel dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 10px; margin: 8px 0; line-height: 1.35; }
 .debug-panel dt { color: #8eaaa5; }
 .debug-panel dd { margin: 0; font-family: Consolas, monospace; overflow-wrap: anywhere; }
 .debug-panel p { color: #91aaa5; font-size: 10px; line-height: 1.5; margin: 0; }
+.ghost-debug { width: 100%; border-collapse: collapse; table-layout: fixed; font: 9px/1.25 Consolas, monospace; }
+.ghost-debug th, .ghost-debug td { border-top: 1px solid #29433f; padding: 4px 3px; text-align: left; vertical-align: top; }
+.ghost-debug thead th { color: #73958e; font-size: 8px; letter-spacing: .6px; }
+.ghost-debug th:first-child { width: 32%; }
+.ghost-debug td small { display: block; margin-top: 2px; color: #78918c; font-size: 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.side-panel:has(.debug-panel) { gap: 10px; }
+.side-panel:has(.debug-panel) .phase-note { display: none; }
+.debug-display-menu { position: absolute; z-index: 4; top: 12px; left: 12px; width: 136px; max-height: calc(100% - 24px); display: flex; flex-direction: column; align-items: flex-start; font-size: 10px; }
+.debug-display-toggle { display: flex; justify-content: space-between; align-items: center; width: 100%; min-height: 30px; padding: 5px 9px; color: #e7e7e0; background: #17181eea; border: 1px solid #50515b; border-radius: 4px; text-align: left; }
+.debug-display-toggle > span { font: 16px/1 Consolas, monospace; color: #ffdf00; }
+.debug-display-toggle:hover { border-color: #b5a435; }
+.debug-display-options { width: 100%; overflow-y: auto; margin-top: 4px; padding: 4px; border: 1px solid #50515b; border-radius: 4px; background: #17181ef2; box-shadow: 0 8px 24px #000b; }
+.debug-display-options label { display: flex; align-items: center; gap: 6px; min-height: 27px; padding: 3px 4px; cursor: pointer; white-space: nowrap; }
+.debug-display-options label:hover { background: #2b2c35; }
+.debug-display-options input { width: 14px; height: 14px; margin: 0; flex: 0 0 auto; accent-color: #ffdf00; }
+.debug-display-options input:focus-visible { outline: 2px solid #ffdf00; outline-offset: 2px; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; clip-path: inset(50%); white-space: nowrap; overflow: hidden; border: 0; }
 
 /* Short desktop windows retain every control with less decorative content. */
-@media (max-height: 760px) {
+@media (max-height: 800px) {
   .side-panel { gap: 12px; }
   .run-stats { padding: 10px 0; }
   .dot-count { margin: 4px 0 7px; }
@@ -97,10 +116,10 @@ h2 { font: 10px/1.3 Consolas, monospace; letter-spacing: 1.5px; font-weight: 400
   .debug-heading button { min-height: 24px; padding: 2px 6px; }
   .debug-panel dl { gap: 3px 8px; margin: 7px 0; }
   .debug-panel p { font-size: 8px; }
+  .ghost-debug th, .ghost-debug td { padding-block: 3px; }
 }
 @media (max-height: 800px) and (min-width: 681px) {
-  .side-panel:has(.debug-panel) { gap: 10px; }
-  .side-panel:has(.debug-panel) .phase-note { display: none; }
+  .side-panel:has(.debug-panel) { gap: 8px; }
 }
 @media (max-width: 960px) {
   .app-shell { padding-inline: 20px; }
@@ -122,6 +141,7 @@ h2 { font: 10px/1.3 Consolas, monospace; letter-spacing: 1.5px; font-weight: 400
   .arcade-top { padding-bottom: 7px; font-size: 9px; }
   .arcade-bottom { padding-top: 7px; font-size: 8px; }
   .screen-bezel { padding: 4px; }
+  .debug-display-menu { top: 7px; left: 7px; max-height: calc(100% - 14px); }
   .side-panel { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: 'stats actions' 'controls controls' 'note note'; gap: 8px 16px; }
   .run-stats { grid-area: stats; border: 0; padding: 2px 0; align-self: center; }
   .stat-heading { font-size: 8px; letter-spacing: .3px; }
@@ -147,11 +167,11 @@ h2 { font: 10px/1.3 Consolas, monospace; letter-spacing: 1.5px; font-weight: 400
   .phase-note p { margin: 0; font-size: 9px; line-height: 1.4; }
   .phase-note br { display: none; }
   .site-footer { display: none; }
-  .debug-panel { position: absolute; z-index: 2; right: 0; bottom: 0; width: min(360px, 100%); max-height: 100%; overflow: hidden; background: #101a1bf8; box-shadow: 0 12px 40px #0009; }
+  .debug-panel { position: fixed; z-index: 2; right: 12px; bottom: 8px; width: min(360px, calc(100vw - 24px)); max-height: calc(100dvh - 60px); overflow: hidden; background: #101a1bf8; box-shadow: 0 12px 40px #0009; }
 }
 
 /* Landscape phones and low desktop windows use a compact horizontal layout. */
-@media (min-width: 520px) and (max-height: 560px) {
+@media (min-width: 681px) and (max-height: 680px), (min-width: 520px) and (max-height: 560px) {
   .app-shell { grid-template-rows: 40px minmax(0, 1fr); padding-inline: 12px; }
   .wordmark { font-size: 21px; }
   .game-layout { padding: 8px 0; grid-template-columns: minmax(0, 1fr) 224px; gap: 14px; }
@@ -174,5 +194,9 @@ h2 { font: 10px/1.3 Consolas, monospace; letter-spacing: 1.5px; font-weight: 400
   .debug-panel { padding: 10px 14px; font-size: 10px; }
   .debug-panel dl { gap: 4px 12px; margin: 8px 0; }
   .debug-panel p { font-size: 9px; }
+  .debug-summary dt:nth-of-type(3), .debug-summary dd:nth-of-type(3),
+  .debug-summary dt:nth-of-type(4), .debug-summary dd:nth-of-type(4),
+  .debug-summary dt:nth-of-type(5), .debug-summary dd:nth-of-type(5),
+  .debug-summary dt:nth-of-type(8), .debug-summary dd:nth-of-type(8) { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .progress-track > span { transition: none; } }

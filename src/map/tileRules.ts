@@ -20,8 +20,14 @@ export function tileType(column: number, row: number): TileType {
 export const canPlayerEnter = (column: number, row: number): boolean =>
   tileType(column, row) === 'corridor';
 
+export const canGhostEnter = (column: number, row: number): boolean =>
+  tileType(column, row) === 'corridor';
+
 // Stored now for Phase 2; these restrictions never affect the player.
 export const GHOST_NO_UP_TILES = [
   { x: 12, y: 11 }, { x: 15, y: 11 },
   { x: 12, y: 23 }, { x: 15, y: 23 },
 ] as const;
+
+export const isGhostNoUpTile = (column: number, row: number): boolean =>
+  GHOST_NO_UP_TILES.some((tile) => tile.x === column && tile.y === row);
