@@ -6,9 +6,10 @@ import { getLevelConfig } from '../config/levelTables';
 import type { GameEngine } from '../engine/GameEngine';
 import { canPlayerEnter } from '../map/tileRules';
 import { visibleDebugTarget } from './DebugTarget';
+import { drawFruit } from './FruitSprites';
 import { MazeRenderer } from './MazeRenderer';
 import { pixelText } from './PixelText';
-import { drawDyingPlayer, drawFruit, drawGhost, drawPlayer } from './SpriteRenderer';
+import { drawDyingPlayer, drawGhost, drawPlayer } from './SpriteRenderer';
 import { FRUIT_POSITION } from '../systems/FruitSystem';
 
 export class Renderer {
@@ -67,7 +68,7 @@ export class Renderer {
       ctx.fillRect(66, 159, 92, 13);
       pixelText(ctx, message, SCREEN_WIDTH / 2, 162, COLORS.player, 'center');
     }
-    if (engine.debug) this.drawDebug(engine);
+    if (engine.debug) this.drawDebug(engine, flash);
     this.drawGhostScorePopups(engine);
   }
 
@@ -92,7 +93,7 @@ export class Renderer {
     }
   }
 
-  private drawDebug(engine: GameEngine): void {
+  private drawDebug(engine: GameEngine, flash: boolean): void {
     const ctx = this.context;
     const display = engine.debugDisplay;
     ctx.save();
@@ -111,6 +112,8 @@ export class Renderer {
       ctx.strokeRect(x - 2, y + MAZE_OFFSET_Y - 2, 4, 4);
     }
     for (const ghost of engine.ghosts) {
+      const frightened = ghost.state === 'FRIGHTENED';
+      const debugColor = frightened ? flash ? '#dedeff' : '#2121ff' : ghost.color;
       if (display.ghostTargets) {
         const targetX = ghost.targetTile.x * TILE_SIZE + TILE_CENTER;
         const targetY = ghost.targetTile.y * TILE_SIZE + TILE_CENTER + MAZE_OFFSET_Y;
@@ -118,21 +121,29 @@ export class Renderer {
           { x: ghost.x, y: ghost.y + MAZE_OFFSET_Y },
           { x: targetX, y: targetY },
         );
-        ctx.strokeStyle = `${ghost.color}88`;
-        ctx.beginPath();
-        ctx.moveTo(ghost.x, ghost.y + MAZE_OFFSET_Y);
-        ctx.lineTo(visibleTarget.x, visibleTarget.y);
-        ctx.stroke();
+        ctx.strokeStyle = `${debugColor}88`;
+        const dx = visibleTarget.x - ghost.x;
+        const dy = visibleTarget.y - (ghost.y + MAZE_OFFSET_Y);
+        const distance = Math.hypot(dx, dy);
+        const spriteEdge = frightened ? 8 : 0;
+        if (distance > spriteEdge) {
+          ctx.beginPath();
+          ctx.moveTo(ghost.x + dx / distance * spriteEdge,
+            ghost.y + MAZE_OFFSET_Y + dy / distance * spriteEdge);
+          ctx.lineTo(visibleTarget.x, visibleTarget.y);
+          ctx.stroke();
+        }
         ctx.strokeRect(visibleTarget.x - 2.5, visibleTarget.y - 2.5, 5, 5);
       }
 
       if (display.directionChoices && ghost.lastDecision) {
-        ctx.fillStyle = ghost.color;
+        ctx.fillStyle = debugColor;
+        const markerDistance = frightened ? 9 : 5;
         for (const direction of ghost.lastDecision.candidates) {
           const vector = { up: [0, -1], left: [-1, 0], down: [0, 1], right: [1, 0] }[direction];
           ctx.fillRect(
-            ghost.x + vector[0] * 5 - 0.75,
-            ghost.y + MAZE_OFFSET_Y + vector[1] * 5 - 0.75,
+            ghost.x + vector[0] * markerDistance - 0.75,
+            ghost.y + MAZE_OFFSET_Y + vector[1] * markerDistance - 0.75,
             1.5,
             1.5,
           );

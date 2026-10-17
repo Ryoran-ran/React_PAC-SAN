@@ -31,7 +31,7 @@ export const LEVEL_ONE_GHOST_MODE_SCHEDULE: readonly GhostModePhase[] = [
 ];
 
 export type FruitKind = 'cherry' | 'strawberry' | 'peach' | 'apple'
-  | 'grapes' | 'galaxian' | 'bell' | 'key';
+  | 'melon' | 'galaxian' | 'bell' | 'key';
 
 export interface LevelConfig {
   readonly playerSpeedPercent: number;
@@ -54,7 +54,7 @@ export interface LevelConfig {
 // https://pacman.holenet.info/ (ROM-level timing remains a Phase 4 task).
 const FRUITS: readonly [FruitKind, number][] = [
   ['cherry', 100], ['strawberry', 300], ['peach', 500], ['peach', 500],
-  ['apple', 700], ['apple', 700], ['grapes', 1000], ['grapes', 1000],
+  ['apple', 700], ['apple', 700], ['melon', 1000], ['melon', 1000],
   ['galaxian', 2000], ['galaxian', 2000], ['bell', 3000], ['bell', 3000],
 ];
 const FRIGHT_SECONDS = [6, 5, 4, 3, 2, 5, 2, 2, 1, 5, 2, 1, 1, 3, 1, 1, 0, 1] as const;
