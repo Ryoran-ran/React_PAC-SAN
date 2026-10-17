@@ -5,7 +5,12 @@ export class ModeScheduler {
   private phaseIndex = 0;
   private framesRemaining: number | null = null;
 
-  public constructor(private readonly schedule: readonly GhostModePhase[] = LEVEL_ONE_GHOST_MODE_SCHEDULE) {
+  public constructor(private schedule: readonly GhostModePhase[] = LEVEL_ONE_GHOST_MODE_SCHEDULE) {
+    this.reset();
+  }
+
+  public setSchedule(schedule: readonly GhostModePhase[]): void {
+    this.schedule = schedule;
     this.reset();
   }
 

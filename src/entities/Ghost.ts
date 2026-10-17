@@ -2,7 +2,8 @@ import { TILE_CENTER, TILE_SIZE, type Direction } from '../config/constants';
 
 export type GhostId = 'blinky' | 'pinky' | 'inky' | 'clyde';
 export type GhostMode = 'SCATTER' | 'CHASE';
-export type GhostHouseState = 'OUTSIDE' | 'PACING_HOME' | 'LEAVING_HOME';
+export type GhostHouseState = 'OUTSIDE' | 'PACING_HOME' | 'LEAVING_HOME' | 'RETURNING_HOME';
+export type GhostState = 'NORMAL' | 'FRIGHTENED' | 'EATEN';
 
 export interface TilePoint {
   readonly x: number;
@@ -53,6 +54,7 @@ export class Ghost {
   public y = 0;
   public direction: Direction;
   public mode: GhostMode = 'SCATTER';
+  public state: GhostState = 'NORMAL';
   public houseState: GhostHouseState;
   public targetTile: TilePoint;
   public pendingReverse = false;
@@ -79,6 +81,7 @@ export class Ghost {
     this.y = this.definition.startTile.y * TILE_SIZE + TILE_SIZE / 2;
     this.direction = this.definition.startDirection;
     this.mode = 'SCATTER';
+    this.state = 'NORMAL';
     this.houseState = this.definition.startHouseState;
     this.targetTile = this.definition.scatterTarget;
     this.pendingReverse = false;

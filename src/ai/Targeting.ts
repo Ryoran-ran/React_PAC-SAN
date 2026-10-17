@@ -43,8 +43,9 @@ export function getGhostTarget(
   ghost: Ghost,
   player: { readonly x: number; readonly y: number; readonly direction: Direction },
   blinky: Ghost,
+  elroy = false,
 ): TilePoint {
-  if (ghost.mode === 'SCATTER') return { ...ghost.scatterTarget };
+  if (ghost.mode === 'SCATTER' && !(ghost.id === 'blinky' && elroy)) return { ...ghost.scatterTarget };
 
   const playerTile = tileFromPosition(player);
   const ghostTile = tileFromPosition(ghost);

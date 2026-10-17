@@ -1,10 +1,12 @@
 import { COLORS, MAZE_COLUMNS, MAZE_OFFSET_Y, MAZE_ROWS, SCREEN_HEIGHT, SCREEN_WIDTH, TILE_CENTER, TILE_SIZE } from '../config/constants';
+import { getLevelConfig } from '../config/levelTables';
 import type { GameEngine } from '../engine/GameEngine';
 import { canPlayerEnter } from '../map/tileRules';
 import { visibleDebugTarget } from './DebugTarget';
 import { MazeRenderer } from './MazeRenderer';
 import { pixelText } from './PixelText';
-import { drawGhost, drawPlayer } from './SpriteRenderer';
+import { drawDyingPlayer, drawFruit, drawGhost, drawPlayer } from './SpriteRenderer';
+import { FRUIT_POSITION } from '../systems/FruitSystem';
 
 export class Renderer {
   private maze = new MazeRenderer();
@@ -35,14 +37,28 @@ export class Renderer {
       } else ctx.fillRect(x - 1, y - 1, 2, 2);
     }
     ctx.restore();
-    for (const ghost of engine.ghosts) drawGhost(ctx, ghost);
-    drawPlayer(ctx, engine.player);
-    pixelText(ctx, 'ROUND 01', 8, 278, COLORS.text);
-    pixelText(ctx, 'PAC-SAN', SCREEN_WIDTH - 8, 278, COLORS.player, 'right');
+    if (engine.fruit.visible) drawFruit(ctx, engine.fruit.kind, FRUIT_POSITION.x, FRUIT_POSITION.y);
+    const config = getLevelConfig(engine.level);
+    const flash = engine.frightenedFramesRemaining > 0
+      && engine.frightenedFramesRemaining <= config.frightenedFlashes * 24
+      && Math.floor(engine.frightenedFramesRemaining / 12) % 2 === 0;
+    if (engine.state !== 'PLAYER_DYING') {
+      for (const ghost of engine.ghosts) drawGhost(ctx, ghost, flash);
+      drawPlayer(ctx, engine.player);
+    } else drawDyingPlayer(ctx, engine.player, engine.stateFramesRemaining);
+    for (let life = 0; life < Math.min(engine.lives - 1, 6); life++) {
+      ctx.fillStyle = COLORS.player;
+      ctx.beginPath();
+      ctx.moveTo(12 + life * 15, 283);
+      ctx.arc(12 + life * 15, 283, 5, 0.25 * Math.PI, 1.75 * Math.PI);
+      ctx.closePath(); ctx.fill();
+    }
+    pixelText(ctx, `ROUND ${String(engine.level).padStart(2, '0')}`, SCREEN_WIDTH - 8, 278, COLORS.text, 'right');
 
     const message = {
-      TITLE: 'PUSH ENTER', READY: 'READY!', PLAYING: '', PAUSED: 'PAUSED', LEVEL_CLEAR: 'CLEAR!',
-    }[engine.state].replace('!', '');
+      TITLE: 'PUSH ENTER', READY: 'READY', PLAYING: '', PAUSED: 'PAUSED',
+      PLAYER_DYING: '', LEVEL_CLEAR: 'CLEAR', GAME_OVER: 'GAME OVER',
+    }[engine.state];
     if (message) {
       ctx.fillStyle = '#000000';
       ctx.fillRect(66, 159, 92, 13);

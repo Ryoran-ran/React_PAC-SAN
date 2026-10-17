@@ -68,7 +68,7 @@ function graphDistances(origin: number): number[] {
 function threatCosts(ghosts: readonly Ghost[], policy: Policy): number[] {
   const costs = Array<number>(TILE_COUNT).fill(0);
   for (const ghost of ghosts) {
-    if (ghost.houseState === 'PACING_HOME') continue;
+    if (ghost.houseState === 'PACING_HOME' || ghost.state !== 'NORMAL') continue;
     const tile = tileOf(ghost);
     let projected = { ...tile };
     for (let step = 0; step <= policy.projectionTiles; step++) {

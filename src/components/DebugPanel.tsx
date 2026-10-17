@@ -11,7 +11,9 @@ export function DebugPanel({ snapshot, onAutoPlayChange, onClose }: {
   onClose: () => void;
 }) {
   const { player } = snapshot;
-  const modeTime = snapshot.ghostModeFramesRemaining === null
+  const modeTime = snapshot.frightenedFramesRemaining > 0
+    ? `${(snapshot.frightenedFramesRemaining / FIXED_FPS).toFixed(1)}s`
+    : snapshot.ghostModeFramesRemaining === null
     ? '∞'
     : `${(snapshot.ghostModeFramesRemaining / FIXED_FPS).toFixed(1)}s`;
 
@@ -34,20 +36,20 @@ export function DebugPanel({ snapshot, onAutoPlayChange, onClose }: {
       <span>{snapshot.autoPlayTarget ? `→ ${snapshot.autoPlayTarget.x},${snapshot.autoPlayTarget.y}` : '目標 —'}</span>
     </div>}
     {snapshot.debugDisplay.engineStats && <dl className="debug-summary">
-      <dt>状態</dt><dd>{snapshot.state}</dd>
+      <dt>状態 / 残機</dt><dd>{snapshot.state} / {snapshot.lives}</dd>
       <dt>ステージ / F</dt><dd>{snapshot.level} / {snapshot.frame}</dd>
       <dt>プレイヤー</dt><dd>{player.x},{player.y} {shortDirection[player.direction]}</dd>
       <dt>タイル / 予約</dt><dd>{player.tileX},{player.tileY} {shortDirection[player.requestedDirection]}</dd>
       <dt>速度</dt><dd>{LEVEL_ONE.playerSpeedPercent}% · {LEVEL_ONE.ghostSpeedPercent}%</dd>
-      <dt>残ドット</dt><dd>{snapshot.remainingDots}</dd>
-      <dt>モード</dt><dd>{snapshot.ghostMode} · {modeTime}</dd>
+      <dt>残ドット</dt><dd>{snapshot.remainingDots} · 果実 {snapshot.fruit.visible ? `${snapshot.fruit.kind} ${snapshot.fruit.framesRemaining}F` : '—'}</dd>
+      <dt>モード</dt><dd>{snapshot.frightenedFramesRemaining > 0 ? 'FRIGHTENED' : snapshot.ghostMode} · {modeTime}</dd>
       <dt>巣カウンタ</dt><dd>{snapshot.ghostHouse.dotCounter} · {snapshot.ghostHouse.idleFrames}F</dd>
     </dl>}
     {snapshot.debugDisplay.ghostTable && <table className="ghost-debug">
       <thead><tr><th>GHOST</th><th>POS / DIR</th><th>TARGET</th></tr></thead>
       <tbody>{snapshot.ghosts.map((ghost) => <tr key={ghost.id}>
         <th style={{ color: ghost.color }}>{ghost.displayName}</th>
-        <td>{ghost.tileX},{ghost.tileY} {shortDirection[ghost.direction]}<small>{ghost.mode} · {ghost.houseState}</small></td>
+        <td>{ghost.tileX},{ghost.tileY} {shortDirection[ghost.direction]}<small>{ghost.state === 'NORMAL' ? ghost.mode : ghost.state} · {ghost.houseState}</small></td>
         <td>{ghost.targetTile.x},{ghost.targetTile.y}<small>{ghost.lastDecision?.candidates.map((direction) => shortDirection[direction]).join('') || '—'}</small></td>
       </tr>)}</tbody>
     </table>}

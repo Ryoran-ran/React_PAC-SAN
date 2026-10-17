@@ -8,6 +8,10 @@ describe('Phase 2 ghost integration', () => {
   it('keeps all outside ghosts on legal corridor centers during a long deterministic run', () => {
     const engine = new GameEngine();
     engine.start();
+    // Hold the player inside the inaccessible house to inspect ghost routes
+    // without ending the run through the new Phase 3 contact rules.
+    engine.player.x = 108;
+    engine.player.y = 116;
     for (let frame = 0; frame < READY_FRAMES + 5000; frame++) {
       engine.update();
       for (const ghost of engine.ghosts) {
