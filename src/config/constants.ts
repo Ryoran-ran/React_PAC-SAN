@@ -13,6 +13,8 @@ export const NORMAL_DOT_POINTS = 10;
 export const POWER_DOT_POINTS = 50;
 export const NORMAL_DOT_FREEZE_FRAMES = 1;
 export const POWER_DOT_FREEZE_FRAMES = 3;
+export const GHOST_EAT_FREEZE_FRAMES = 12;
+export const GHOST_SCORE_POPUP_FRAMES = 36;
 export const TOTAL_DOTS = 244;
 // TODO Phase 4: verify the arcade READY duration against frame recordings.
 export const READY_FRAMES = 90;

@@ -1,5 +1,6 @@
 import {
-  DYING_FRAMES, EXTRA_LIFE_SCORE, INITIAL_LIVES, LEVEL_CLEAR_FRAMES,
+  DYING_FRAMES, EXTRA_LIFE_SCORE, GHOST_EAT_FREEZE_FRAMES, GHOST_SCORE_POPUP_FRAMES,
+  INITIAL_LIVES, LEVEL_CLEAR_FRAMES,
   NORMAL_DOT_FREEZE_FRAMES, POWER_DOT_FREEZE_FRAMES, READY_FRAMES,
   TILE_SIZE, TOTAL_DOTS, type Direction,
 } from '../config/constants';
@@ -18,6 +19,13 @@ import { isAtTileCenter } from './CollisionSystem';
 import type { GameState } from './GameState';
 import { DEFAULT_DEBUG_DISPLAY, type DebugDisplayKey, type DebugDisplayOptions } from './DebugDisplay';
 import { GameRandom } from './Random';
+
+export interface GhostScorePopup {
+  readonly x: number;
+  readonly y: number;
+  readonly points: number;
+  framesRemaining: number;
+}
 
 export class GameEngine {
   state: GameState = 'TITLE';
@@ -39,6 +47,8 @@ export class GameEngine {
   stateFramesRemaining = 0;
   frightenedFramesRemaining = 0;
   ghostCombo = 0;
+  ghostEatFreezeFrames = 0;
+  ghostScorePopups: GhostScorePopup[] = [];
   debug = false;
   debugDisplay: DebugDisplayOptions = { ...DEFAULT_DEBUG_DISPLAY };
   autoPlayLevel: AutoPlayLevel | null = null;
@@ -76,6 +86,8 @@ export class GameEngine {
     this.stateFramesRemaining = 0;
     this.frightenedFramesRemaining = 0;
     this.ghostCombo = 0;
+    this.ghostEatFreezeFrames = 0;
+    this.ghostScorePopups = [];
     this.autoPlayTarget = null;
     this.autoDecisionCenter = null;
     this.state = 'READY';
@@ -134,6 +146,11 @@ export class GameEngine {
     }
     if (this.state === 'READY') {
       if (--this.readyFrames <= 0) this.state = 'PLAYING';
+      return;
+    }
+    this.ghostScorePopups = this.ghostScorePopups.filter((popup) => --popup.framesRemaining > 0);
+    if (this.ghostEatFreezeFrames > 0) {
+      this.ghostEatFreezeFrames--;
       return;
     }
     this.playFrame++;
@@ -257,9 +274,17 @@ export class GameEngine {
         ghost.state = 'EATEN';
         ghost.targetTile = { x: 13, y: 11 };
         ghost.requestReverse();
-        this.addScore(200 * 2 ** Math.min(this.ghostCombo, 3));
+        const points = 200 * 2 ** Math.min(this.ghostCombo, 3);
+        this.addScore(points);
+        this.ghostScorePopups.push({
+          x: ghost.x, y: ghost.y, points,
+          framesRemaining: GHOST_SCORE_POPUP_FRAMES,
+        });
+        this.ghostEatFreezeFrames = GHOST_EAT_FREEZE_FRAMES;
         this.ghostCombo++;
       } else {
+        this.ghostEatFreezeFrames = 0;
+        this.ghostScorePopups = [];
         this.lives--;
         this.state = 'PLAYER_DYING';
         this.stateFramesRemaining = DYING_FRAMES;
@@ -287,6 +312,8 @@ export class GameEngine {
       lives: this.lives, stateFramesRemaining: this.stateFramesRemaining,
       frightenedFramesRemaining: this.frightenedFramesRemaining,
       ghostCombo: this.ghostCombo, randomState: this.random.state,
+      ghostEatFreezeFrames: this.ghostEatFreezeFrames,
+      ghostScorePopups: this.ghostScorePopups.map((popup) => ({ ...popup })),
       elroyStage: this.elroyStage,
       fruit: { kind: this.fruit.kind, points: this.fruit.points,
         visible: this.fruit.visible, framesRemaining: this.fruit.framesRemaining,

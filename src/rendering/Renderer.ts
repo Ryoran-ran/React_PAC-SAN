@@ -1,4 +1,7 @@
-import { COLORS, MAZE_COLUMNS, MAZE_OFFSET_Y, MAZE_ROWS, SCREEN_HEIGHT, SCREEN_WIDTH, TILE_CENTER, TILE_SIZE } from '../config/constants';
+import {
+  COLORS, GHOST_EAT_FREEZE_FRAMES, GHOST_SCORE_POPUP_FRAMES, MAZE_COLUMNS,
+  MAZE_OFFSET_Y, MAZE_ROWS, SCREEN_HEIGHT, SCREEN_WIDTH, TILE_CENTER, TILE_SIZE,
+} from '../config/constants';
 import { getLevelConfig } from '../config/levelTables';
 import type { GameEngine } from '../engine/GameEngine';
 import { canPlayerEnter } from '../map/tileRules';
@@ -44,7 +47,7 @@ export class Renderer {
       && Math.floor(engine.frightenedFramesRemaining / 12) % 2 === 0;
     if (engine.state !== 'PLAYER_DYING') {
       for (const ghost of engine.ghosts) drawGhost(ctx, ghost, flash);
-      drawPlayer(ctx, engine.player);
+      if (engine.ghostEatFreezeFrames === 0) drawPlayer(ctx, engine.player);
     } else drawDyingPlayer(ctx, engine.player, engine.stateFramesRemaining);
     for (let life = 0; life < Math.min(engine.lives - 1, 6); life++) {
       ctx.fillStyle = COLORS.player;
@@ -65,6 +68,28 @@ export class Renderer {
       pixelText(ctx, message, SCREEN_WIDTH / 2, 162, COLORS.player, 'center');
     }
     if (engine.debug) this.drawDebug(engine);
+    this.drawGhostScorePopups(engine);
+  }
+
+  private drawGhostScorePopups(engine: GameEngine): void {
+    const ctx = this.context;
+    for (const [index, popup] of engine.ghostScorePopups.entries()) {
+      const elapsed = GHOST_SCORE_POPUP_FRAMES - popup.framesRemaining;
+      const rise = Math.floor(Math.max(0, elapsed - GHOST_EAT_FREEZE_FRAMES) / 8);
+      const overlap = engine.ghostScorePopups.slice(0, index)
+        .filter((earlier) => earlier.x === popup.x && earlier.y === popup.y).length;
+      const y = popup.y + MAZE_OFFSET_Y - 4 - rise - overlap * 9;
+      const width = String(popup.points).length * 6 - 1;
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, popup.framesRemaining / 10);
+      for (const offset of [-SCREEN_WIDTH, 0, SCREEN_WIDTH]) {
+        const x = popup.x + offset;
+        ctx.fillStyle = COLORS.background;
+        ctx.fillRect(Math.round(x - width / 2) - 2, y - 1, width + 4, 9);
+        pixelText(ctx, String(popup.points), x, y, '#a8ffff', 'center');
+      }
+      ctx.restore();
+    }
   }
 
   private drawDebug(engine: GameEngine): void {

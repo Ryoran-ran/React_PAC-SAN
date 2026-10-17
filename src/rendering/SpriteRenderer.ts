@@ -5,6 +5,49 @@ import type { FruitKind } from '../config/levelTables';
 
 const angles = { right: 0, down: Math.PI / 2, left: Math.PI, up: -Math.PI / 2 };
 
+// The arcade sprite's visible 14x14 pixels, with its two alternating foot frames.
+// Reference: https://github.com/sgothel/pacman/blob/master/media/tiles_all.png
+// # is the body, o is the face, and . is transparent.
+const FRIGHTENED_HEAD = [
+  '.....####.....',
+  '...########...',
+  '..##########..',
+  '.############.',
+  '.############.',
+  '.###oo##oo###.',
+  '####oo##oo####',
+  '##############',
+  '##############',
+  '##oo##oo##oo##',
+  '#o##oo##oo##o#',
+  '##############',
+] as const;
+const FRIGHTENED_FEET = [
+  ['####.####.####', '.##...##...##.'],
+  ['##.###..###.##', '#...##..##...#'],
+] as const;
+
+function drawFrightenedGhost(context: CanvasRenderingContext2D, x: number, y: number, flash: boolean, footFrame: number): void {
+  const rows = [...FRIGHTENED_HEAD, ...FRIGHTENED_FEET[footFrame]];
+  const left = Math.round(x) - 7;
+  const top = Math.round(y) - 7;
+  const bodyColor = flash ? '#dedeff' : '#2121ff';
+  const faceColor = flash ? '#ff0000' : '#ffb7ae';
+
+  for (let row = 0; row < rows.length; row++) {
+    const pixels = rows[row];
+    for (let column = 0; column < pixels.length;) {
+      const pixel = pixels[column];
+      if (pixel === '.') { column++; continue; }
+      let end = column + 1;
+      while (end < pixels.length && pixels[end] === pixel) end++;
+      context.fillStyle = pixel === '#' ? bodyColor : faceColor;
+      context.fillRect(left + column, top + row, end - column, 1);
+      column = end;
+    }
+  }
+}
+
 export function drawPlayer(context: CanvasRenderingContext2D, player: PacSan): void {
   const phase = Math.floor(player.steps / 3) % 4;
   const mouth = [0.04, 0.22, 0.38, 0.22][phase] * Math.PI;
@@ -36,8 +79,12 @@ export function drawGhost(context: CanvasRenderingContext2D, ghost: Ghost, flash
   const pupil = DIRECTIONS[ghost.direction];
   for (const offset of [-SCREEN_WIDTH, 0, SCREEN_WIDTH]) {
     const x = ghost.x + offset;
-    if (ghost.state !== 'EATEN') {
-      context.fillStyle = ghost.state === 'FRIGHTENED' ? flash ? '#f3f3ff' : '#2626d8' : ghost.color;
+    if (ghost.state === 'FRIGHTENED') {
+      drawFrightenedGhost(context, x, y, flash, Math.floor(ghost.stepsMoved / 4) % 2);
+      continue;
+    }
+    if (ghost.state === 'NORMAL') {
+      context.fillStyle = ghost.color;
       context.beginPath();
       context.arc(x, y - 1, 6.5, Math.PI, 0);
       context.lineTo(x + 6.5, y + 6);

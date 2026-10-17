@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { DYING_FRAMES, EXTRA_LIFE_SCORE, LEVEL_CLEAR_FRAMES, READY_FRAMES, TILE_CENTER, TILE_SIZE } from '../config/constants';
+import {
+  DYING_FRAMES, EXTRA_LIFE_SCORE, GHOST_EAT_FREEZE_FRAMES, GHOST_SCORE_POPUP_FRAMES,
+  LEVEL_CLEAR_FRAMES, READY_FRAMES, TILE_CENTER, TILE_SIZE,
+} from '../config/constants';
 import { getLevelConfig } from '../config/levelTables';
 import { GameEngine } from '../engine/GameEngine';
 import { GameRandom } from '../engine/Random';
@@ -107,9 +110,36 @@ describe('Phase 3 game systems', () => {
     expect(engine.ghostCombo).toBe(2);
     expect(engine.ghosts.every((ghost) => ghost.state === 'EATEN')).toBe(true);
     expect(engine.lives).toBe(3);
+    expect(engine.ghostEatFreezeFrames).toBe(GHOST_EAT_FREEZE_FRAMES);
+    expect(engine.ghostScorePopups.map((popup) => popup.points)).toEqual([200, 400]);
+    expect(engine.ghostScorePopups.map((popup) => [popup.x, popup.y]))
+      .toEqual([[at(1), at(3)], [at(1), at(3)]]);
+
+    const playerPosition = [engine.player.x, engine.player.y];
+    const ghostPositions = engine.ghosts.map((ghost) => [ghost.x, ghost.y]);
+    const frightenedFrames = engine.frightenedFramesRemaining;
+    const modeFrames = engine.modeScheduler.remainingFrames;
+    const playFrame = engine.playFrame;
+    engine.pause();
+    engine.update();
+    expect(engine.ghostEatFreezeFrames).toBe(GHOST_EAT_FREEZE_FRAMES);
+    engine.togglePause();
+    for (let frame = 0; frame < GHOST_EAT_FREEZE_FRAMES; frame++) engine.update();
+    expect([engine.player.x, engine.player.y]).toEqual(playerPosition);
+    expect(engine.ghosts.map((ghost) => [ghost.x, ghost.y])).toEqual(ghostPositions);
+    expect(engine.frightenedFramesRemaining).toBe(frightenedFrames);
+    expect(engine.modeScheduler.remainingFrames).toBe(modeFrames);
+    expect(engine.playFrame).toBe(playFrame);
+    expect(engine.ghostScorePopups.map((popup) => popup.framesRemaining))
+      .toEqual([GHOST_SCORE_POPUP_FRAMES - GHOST_EAT_FREEZE_FRAMES, GHOST_SCORE_POPUP_FRAMES - GHOST_EAT_FREEZE_FRAMES]);
+
     engine.update();
     expect(engine.state).toBe('PLAYING');
     expect(engine.score).toBe(650);
+    expect(engine.playFrame).toBe(playFrame + 1);
+    expect(engine.frightenedFramesRemaining).toBe(frightenedFrames - 1);
+    for (let frame = 1; frame < GHOST_SCORE_POPUP_FRAMES - GHOST_EAT_FREEZE_FRAMES; frame++) engine.update();
+    expect(engine.ghostScorePopups).toEqual([]);
   });
 
   it('returns eaten eyes through the house and releases a revived ghost', () => {
