@@ -20,19 +20,33 @@ describe('integer-pixel movement', () => {
     expect(player.steps).toBe(0);
   });
 
-  it('buffers a turn until the first legal center and never moves diagonally', () => {
+  it('buffers a turn and diagonally corrects into the next corridor before the center', () => {
     const turning = playerAt(3, 1);
     turning.direction = 'right'; turning.requestedDirection = 'down';
     let prior = { x: turning.x, y: turning.y };
     for (let i = 0; i < 25; i++) {
       movePlayer(turning);
-      expect(Math.abs(turning.x - prior.x) + Math.abs(turning.y - prior.y)).toBe(1);
+      expect(Math.abs(turning.x - prior.x)).toBeLessThanOrEqual(1);
+      expect(Math.abs(turning.y - prior.y)).toBeLessThanOrEqual(1);
       prior = { x: turning.x, y: turning.y };
     }
     expect(turning.x).toBe(52);
-    expect(turning.y).toBe(13);
+    expect(turning.y).toBe(16);
     expect(turning.direction).toBe('down');
     expect(turning.requestedDirection).toBe('down');
+  });
+
+  it('corrects a turn requested just after the center back to the new centerline', () => {
+    const turning = playerAt(6, 1);
+    turning.direction = 'right'; turning.requestedDirection = 'right';
+    movePlayer(turning); movePlayer(turning);
+    expect(turning.x).toBe(54);
+    turning.requestedDirection = 'down';
+    movePlayer(turning);
+    expect([turning.x, turning.y]).toEqual([53, 13]);
+    movePlayer(turning);
+    expect([turning.x, turning.y]).toEqual([52, 14]);
+    expect(turning.turning).toBeNull();
   });
 
   it('retains a blocked input while continuing forward', () => {

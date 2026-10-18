@@ -69,15 +69,23 @@ export class MazeRenderer {
     }
   }
 
-  draw(context: CanvasRenderingContext2D): void {
+  draw(context: CanvasRenderingContext2D, whiteWalls = false): void {
     // Pixel-exact transparent maze art from the arcade sprite reference. The
     // generated contour below is a fallback until the image has loaded.
     if (this.arcadeImage?.complete
       && this.arcadeImage.naturalWidth === SCREEN_WIDTH
       && this.arcadeImage.naturalHeight === SCREEN_HEIGHT) {
-      context.drawImage(this.arcadeImage, 0, -MAZE_OFFSET_Y);
+      if (whiteWalls) {
+        context.save();
+        context.filter = 'brightness(0) invert(1)';
+        context.drawImage(this.arcadeImage, 0, -MAZE_OFFSET_Y);
+        context.restore();
+        // The door keeps its pink palette entry while the blue maze flashes.
+        context.fillStyle = COLORS.gate;
+        context.fillRect(13 * TILE_SIZE, 12 * TILE_SIZE + 5, 2 * TILE_SIZE, 2);
+      } else context.drawImage(this.arcadeImage, 0, -MAZE_OFFSET_Y);
     } else {
-      context.fillStyle = COLORS.wall;
+      context.fillStyle = whiteWalls ? COLORS.text : COLORS.wall;
       for (const contour of this.contours) {
         const radiusAt = (index: number): number => {
           const point = contour[index];

@@ -23,7 +23,50 @@ const GHOST_FEET = [
   ['####.####.####', '.##...##...##.'],
   ['##.###..###.##', '#...##..##...#'],
 ] as const;
-const EYE_WHITE = ['.##.', '####', '####', '####', '.##.'] as const;
+// Eye pixels from the four direction frames in the arcade sprite sheet.
+// Each frame shares the same 14x14 body; the whites move with the pupils.
+// Reference: https://github.com/sgothel/pacman/blob/master/media/tiles_all.png
+const GHOST_EYES: Record<Ghost['direction'], readonly string[]> = {
+  right: [
+    '..............',
+    '..............',
+    '..............',
+    '....WW....WW..',
+    '...WWWW..WWWW.',
+    '...WWBB..WWBB.',
+    '...WWBB..WWBB.',
+    '....WW....WW..',
+  ],
+  left: [
+    '..............',
+    '..............',
+    '..............',
+    '..WW....WW....',
+    '.WWWW..WWWW...',
+    '.BBWW..BBWW...',
+    '.BBWW..BBWW...',
+    '..WW....WW....',
+  ],
+  up: [
+    '..............',
+    '...BB....BB...',
+    '..WBBW..WBBW..',
+    '..WWWW..WWWW..',
+    '..WWWW..WWWW..',
+    '...WW....WW...',
+  ],
+  down: [
+    '..............',
+    '..............',
+    '..............',
+    '..............',
+    '...WW....WW...',
+    '..WWWW..WWWW..',
+    '..WWWW..WWWW..',
+    '..WBBW..WBBW..',
+    '...BB....BB...',
+  ],
+};
 
 // 13x13 visible pixels from the arcade sprite sheet. The hardware sprite box
 // is larger, but the yellow art itself is 13 pixels wide and high.
@@ -165,13 +208,8 @@ export function drawDyingPlayer(context: CanvasRenderingContext2D, player: PacSa
 
 function drawEyes(context: CanvasRenderingContext2D, left: number, top: number,
   direction: Ghost['direction']): void {
-  const pupilX = direction === 'left' ? 0 : direction === 'right' ? 2 : 1;
-  const pupilY = direction === 'up' ? 0 : direction === 'down' ? 3 : 1;
-  for (const eyeX of [2, 8]) {
-    paintPixels(context, EYE_WHITE, left + eyeX, top + 4, { '#': '#ffffff' });
-    paintPixels(context, ['##', '##'], left + eyeX + pupilX,
-      top + 4 + pupilY, { '#': '#2121b5' });
-  }
+  paintPixels(context, GHOST_EYES[direction], left, top,
+    { W: '#dedeff', B: '#2121ff' });
 }
 
 /** The arcade house is centered between columns 13 and 14, while AI uses tile centers. */

@@ -39,6 +39,31 @@ describe('pixel-art field', () => {
     }
   });
 
+  it('flashes loaded walls white while keeping the house gate pink', () => {
+    class LoadedImage {
+      src = '';
+      complete = true;
+      naturalWidth = SCREEN_WIDTH;
+      naturalHeight = 288;
+    }
+    vi.stubGlobal('Image', LoadedImage);
+    try {
+      const drawn: string[] = [];
+      const gate: unknown[][] = [];
+      const context: CanvasRenderingContext2D = {
+        filter: 'none', fillStyle: '',
+        save() {}, restore() {},
+        drawImage() { drawn.push(context.filter); },
+        fillRect(...args: unknown[]) { gate.push([context.fillStyle, ...args]); },
+      } as unknown as CanvasRenderingContext2D;
+      new MazeRenderer().draw(context, true);
+      expect(drawn).toEqual(['brightness(0) invert(1)']);
+      expect(gate).toEqual([['#ffb8ff', 104, 101, 16, 2]]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('draws every maze outline segment on integer logical pixels', () => {
     const { context, pixels } = recordingContext();
     new MazeRenderer().draw(context);

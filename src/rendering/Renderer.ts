@@ -1,8 +1,8 @@
 import {
-  COLORS, FRUIT_SCORE_POPUP_FRAMES, GHOST_EAT_FREEZE_FRAMES, GHOST_SCORE_POPUP_FRAMES, MAZE_COLUMNS,
+  COLORS, GHOST_EAT_FREEZE_FRAMES, GHOST_SCORE_POPUP_FRAMES, MAZE_COLUMNS,
   MAZE_OFFSET_Y, MAZE_ROWS, SCREEN_HEIGHT, SCREEN_WIDTH, TILE_CENTER, TILE_SIZE,
 } from '../config/constants';
-import { getFruitCounter, getLevelConfig } from '../config/levelTables';
+import { getLevelConfig } from '../config/levelTables';
 import type { GameEngine } from '../engine/GameEngine';
 import { canPlayerEnter } from '../map/tileRules';
 import { visibleDebugTarget } from './DebugTarget';
@@ -33,7 +33,10 @@ export class Renderer {
     pixelText(ctx, String(engine.highScore).padStart(6, '0'), 136, 12, COLORS.text, 'center');
     ctx.save();
     ctx.translate(0, MAZE_OFFSET_Y);
-    this.maze.draw(ctx);
+    const clearing = engine.state === 'LEVEL_CLEAR';
+    const whiteWalls = clearing && engine.stateFramesRemaining <= 60
+      && Math.floor(engine.stateFramesRemaining / 8) % 2 === 0;
+    this.maze.draw(ctx, whiteWalls);
     // Draw every cookie in backing-store pixels. Fractional CSS scaling would
     // otherwise turn identical 2×2 cookies into different visible sizes.
     const cookieTransform = ctx.getTransform();
@@ -60,22 +63,20 @@ export class Renderer {
     const flash = engine.frightenedFramesRemaining > 0
       && engine.frightenedFramesRemaining <= config.frightenedFlashes * 24
       && Math.floor(engine.frightenedFramesRemaining / 12) % 2 === 0;
+    const ghostsVisible = engine.state !== 'PLAYER_DYING' && !clearing;
     if (engine.state !== 'PLAYER_DYING') {
-      for (const ghost of engine.ghosts) drawGhost(ctx, ghost, flash);
+      if (ghostsVisible) for (const ghost of engine.ghosts) drawGhost(ctx, ghost, flash);
       if (engine.ghostEatFreezeFrames === 0) drawPlayer(ctx, engine.player);
     } else drawDyingPlayer(ctx, engine.player, engine.stateFramesRemaining);
-    for (let life = 0; life < Math.min(engine.lives - 1, 6); life++) {
+    for (let life = 0; engine.gameMode !== 'freeplay' && life < Math.min(engine.lives - 1, 6); life++) {
       drawLifeIcon(ctx, 12 + life * 15, SCREEN_HEIGHT - 7);
     }
-    const stageFruits = getFruitCounter(engine.level);
-    for (let index = 0; index < stageFruits.length; index++) {
-      drawFruit(ctx, stageFruits[index],
-        SCREEN_WIDTH - 12 - (stageFruits.length - index - 1) * 16, SCREEN_HEIGHT - 7);
-    }
+    pixelText(ctx, `ROUND ${String(engine.level).padStart(2, '0')}`,
+      SCREEN_WIDTH - 8, SCREEN_HEIGHT - 10, COLORS.text, 'right');
 
     const message = {
       TITLE: 'PUSH ENTER', READY: 'READY', PLAYING: '', PAUSED: 'PAUSED',
-      PLAYER_DYING: '', LEVEL_CLEAR: 'CLEAR', GAME_OVER: 'GAME OVER',
+      PLAYER_DYING: '', LEVEL_CLEAR: '', GAME_OVER: 'GAME OVER',
     }[engine.state];
     if (message) {
       const width = message.length * 6 - 1;
@@ -85,7 +86,7 @@ export class Renderer {
       ctx.fillRect(left - 3, top - 2, width + 6, 11);
       pixelText(ctx, message, SCREEN_WIDTH / 2, top, COLORS.player, 'center');
     }
-    if (engine.debug) this.drawDebug(engine, flash);
+    if (engine.debug) this.drawDebug(engine, flash, ghostsVisible);
     this.drawGhostScorePopups(engine);
     if (engine.state === 'PLAYING') this.drawFruitScorePopup(engine);
   }
@@ -94,13 +95,11 @@ export class Renderer {
     const popup = engine.fruitScorePopup;
     if (!popup) return;
     const ctx = this.context;
-    const label = `+${popup.points}`;
-    const elapsed = FRUIT_SCORE_POPUP_FRAMES - popup.framesRemaining;
+    const label = String(popup.points);
     const x = FRUIT_POSITION.x;
-    const y = FRUIT_POSITION.y + MAZE_OFFSET_Y - 4 - Math.floor(elapsed / 12);
+    const y = FRUIT_POSITION.y + MAZE_OFFSET_Y - 4;
     const width = label.length * 6 - 1;
     ctx.save();
-    ctx.globalAlpha = Math.min(1, popup.framesRemaining / 15);
     ctx.fillStyle = COLORS.background;
     ctx.fillRect(Math.round(x - width / 2) - 2, y - 1, width + 4, 9);
     pixelText(ctx, label, x, y, '#ffb8ff', 'center');
@@ -128,7 +127,7 @@ export class Renderer {
     }
   }
 
-  private drawDebug(engine: GameEngine, flash: boolean): void {
+  private drawDebug(engine: GameEngine, flash: boolean, ghostsVisible: boolean): void {
     const ctx = this.context;
     const display = engine.debugDisplay;
     ctx.save();
@@ -146,11 +145,12 @@ export class Renderer {
       const { x, y } = engine.player;
       ctx.strokeRect(x - 2, y + MAZE_OFFSET_Y - 2, 4, 4);
     }
-    for (const ghost of engine.ghosts) {
+    if (ghostsVisible) for (const ghost of engine.ghosts) {
       const visualX = ghostVisualX(ghost);
       const frightened = ghost.state === 'FRIGHTENED';
       const debugColor = frightened ? flash ? '#dedeff' : '#2121ff' : ghost.color;
-      if (display.ghostTargets) {
+      // Frightened turns are random; their normal chase/scatter target is not in use.
+      if (display.ghostTargets && !frightened) {
         const targetX = ghost.targetTile.x * TILE_SIZE + TILE_CENTER;
         const targetY = ghost.targetTile.y * TILE_SIZE + TILE_CENTER + MAZE_OFFSET_Y;
         const visibleTarget = visibleDebugTarget(

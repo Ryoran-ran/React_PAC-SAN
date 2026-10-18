@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { SoundEngine } from '../audio/SoundEngine';
 import { SCREEN_HEIGHT, SCREEN_WIDTH } from '../config/constants';
 import type { GameEngine } from '../engine/GameEngine';
+import type { GameMode } from '../engine/GameModes';
 import { GameLoop, type GameSpeed } from '../engine/GameLoop';
 import { attachKeyboard } from '../input/KeyboardController';
 import { attachSwipe } from '../input/SwipeController';
@@ -10,12 +11,17 @@ import { saveHighScore } from '../storage/highScore';
 
 type Snapshot = ReturnType<GameEngine['snapshot']>;
 
-export function GameCanvas({ engine, sound, speed, onSnapshot }: {
+export function GameCanvas({ engine, sound, speed, onSnapshot, onStart, onMenuModeChange }: {
   engine: GameEngine; sound: SoundEngine; speed: GameSpeed; onSnapshot: (snapshot: Snapshot) => void;
+  onStart: () => void; onMenuModeChange: (mode: GameMode) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const loopRef = useRef<GameLoop | null>(null);
+  const startRef = useRef(onStart);
+  const menuModeRef = useRef(onMenuModeChange);
+  startRef.current = onStart;
+  menuModeRef.current = onMenuModeChange;
   const [display, setDisplay] = useState({ scale: 1, pixelRatio: 1 });
   const [error, setError] = useState(false);
 
@@ -42,7 +48,10 @@ export function GameCanvas({ engine, sound, speed, onSnapshot }: {
       }
     });
     loopRef.current = loop;
-    const detach = attachKeyboard(engine, window);
+    const detach = attachKeyboard(engine, window, {
+      onStart: () => startRef.current(),
+      onMenuModeChange: (mode) => menuModeRef.current(mode),
+    });
     const detachSwipe = attachSwipe(viewport, (direction) => {
       engine.requestDirection(direction);
       onSnapshot(engine.snapshot());
