@@ -139,6 +139,7 @@ interface TasRoute {
   readonly target: number;
   readonly visited: ReadonlySet<number>;
   readonly poweredUntil: number;
+  readonly fruitCollected: boolean;
 }
 
 const TAS_HORIZON_TILES = 9;
@@ -175,9 +176,9 @@ function ghostForecast(ghosts: readonly Ghost[], context: TasContext,
   return result;
 }
 
-function nearestDotDistances(maze: Maze): number[] {
+function nearestDistances(targets: Iterable<number>): number[] {
   const distances = Array<number>(TILE_COUNT).fill(Number.POSITIVE_INFINITY);
-  const queue = [...maze.dots.keys()];
+  const queue = [...targets];
   for (const index of queue) distances[index] = 0;
   for (let head = 0; head < queue.length; head++) {
     const current = queue[head];
@@ -188,6 +189,10 @@ function nearestDotDistances(maze: Maze): number[] {
     }
   }
   return distances;
+}
+
+function nearestDotDistances(maze: Maze): number[] {
+  return nearestDistances(maze.dots.keys());
 }
 
 function projectedRisk(from: number, to: number, startTime: number, moveFrames: number,
@@ -231,9 +236,37 @@ function chooseTasDirection(player: PacSan, ghosts: readonly Ghost[], maze: Maze
   context: TasContext): AutoPlayDecision | null {
   const playerTile = tileOf(player);
   const start = tileIndex(playerTile.x, playerTile.y);
+  const config = getLevelConfig(context.round);
+  const speed = context.frightenedFramesRemaining > 0
+    ? config.frightenedPlayerSpeedPercent : config.playerSpeedPercent;
+  const moveFrames = Math.ceil(TILE_SIZE * 80 / speed);
+  const fruitIndex = tileIndex(Math.floor(FRUIT_POSITION.x / TILE_SIZE),
+    Math.floor(FRUIT_POSITION.y / TILE_SIZE));
+  const fruitDistances = context.fruit?.visible ? graphDistances(fruitIndex) : null;
+  // A detour only pays when the fruit can be reached before both timers run out.
+  const fruitGoal = !!fruitDistances && Number.isFinite(fruitDistances[start])
+    && fruitDistances[start] <= 12
+    && (fruitDistances[start] + 2) * moveFrames + player.freezeFrames
+      < context.fruit!.framesRemaining
+    && (fruitDistances[start] + 2) * moveFrames + player.freezeFrames + 20
+      < context.frightenedFramesRemaining;
+  const edibleGhosts = ghosts.filter((ghost) => ghost.houseState === 'OUTSIDE'
+    && ghost.state === 'FRIGHTENED');
+  const huntDistances = context.frightenedFramesRemaining > moveFrames * 3
+    && edibleGhosts.length > 0
+    ? nearestDistances(edibleGhosts.map((ghost) => tileIndex(tileOf(ghost).x, tileOf(ghost).y)))
+    : null;
+  const huntGoal = !!huntDistances && huntDistances[start] <= 8
+    && (huntDistances[start] + 2) * moveFrames
+      < context.frightenedFramesRemaining * 0.7;
+  const huntTargetDistances = huntGoal ? graphDistances(start) : null;
+  const huntTarget = huntGoal ? edibleGhosts
+    .map((ghost) => tileIndex(tileOf(ghost).x, tileOf(ghost).y))
+    .sort((a, b) => huntTargetDistances![a] - huntTargetDistances![b])[0] : null;
   // Follow a whole-maze dot route during a safe frightened window or when
   // only scattered dots remain. The short beam can flip its distant goal.
-  if ((maze.remainingDots <= 12 || context.frightenedFramesRemaining > 30)
+  if (!fruitGoal && !huntGoal
+    && (maze.remainingDots <= 12 || context.frightenedFramesRemaining > 30)
     && ghosts.every((ghost) =>
       ghost.houseState !== 'OUTSIDE' || ghost.state === 'EATEN'
         || (ghost.state === 'FRIGHTENED' && context.frightenedFramesRemaining > 30)
@@ -241,22 +274,30 @@ function chooseTasDirection(player: PacSan, ghosts: readonly Ghost[], maze: Maze
     const route = chooseAutoDirection(player, ghosts, maze, 'expert', context);
     if (route) return route;
   }
-  const config = getLevelConfig(context.round);
-  const speed = context.frightenedFramesRemaining > 0
-    ? config.frightenedPlayerSpeedPercent : config.playerSpeedPercent;
   // MovementSystem advances at speed / 80 pixels per frame on average.
-  const moveFrames = Math.ceil(TILE_SIZE * 80 / speed);
   const forecast = ghostForecast(ghosts, context,
     player.freezeFrames + TAS_HORIZON_TILES * (moveFrames + 3) + 1);
   const staticThreat = threatCosts(ghosts, POLICIES.tas);
   const dotDistances = nearestDotDistances(maze);
-  const fruitIndex = tileIndex(Math.floor(FRUIT_POSITION.x / TILE_SIZE),
-    Math.floor(FRUIT_POSITION.y / TILE_SIZE));
+  // Keep power cookies in reserve when no ghost is close enough to exploit them.
+  const powerOpportunity = new Map<number, number>();
+  if (config.frightenedFrames > 0) {
+    const usefulRadius = Math.max(3, Math.min(8,
+      Math.floor(config.frightenedFrames / moveFrames / 4)));
+    for (const [index, dot] of maze.dots) {
+      if (dot !== 'power') continue;
+      const distances = graphDistances(index);
+      powerOpportunity.set(index, ghosts.filter((ghost) => ghost.houseState === 'OUTSIDE'
+        && ghost.state !== 'EATEN'
+        && distances[tileIndex(tileOf(ghost).x, tileOf(ghost).y)] <= usefulRadius).length);
+    }
+  }
   let routes: TasRoute[] = neighbors(start).map((neighbor) => ({
     index: start, time: player.freezeFrames, score: 0,
     firstDirection: neighbor.direction, target: start,
     visited: new Set<number>([start]),
     poweredUntil: context.frightenedFramesRemaining,
+    fruitCollected: false,
   }));
   if (routes.length === 0) return null;
 
@@ -271,26 +312,37 @@ function chooseTasDirection(player: PacSan, ghosts: readonly Ghost[], maze: Maze
         if (!Number.isFinite(risk)) continue;
         const dot = maze.dots.get(neighbor.index);
         const freshDot = dot && !route.visited.has(neighbor.index);
-        const fruit = context.fruit?.visible && neighbor.index === fruitIndex
-          && time < context.fruit.framesRemaining && !route.visited.has(neighbor.index);
+        const fruit = fruitGoal && !route.fruitCollected && neighbor.index === fruitIndex
+          && time < context.fruit!.framesRemaining;
         const poweredUntil = freshDot && dot === 'power' ? time + config.frightenedFrames
           : route.poweredUntil;
         const visited = new Set(route.visited);
         visited.add(neighbor.index);
         const backtrack = route.visited.has(neighbor.index) ? 4 : 0;
         const reverse = depth === 0 && neighbor.direction === OPPOSITE[player.direction] ? 1 : 0;
-        const reward = freshDot ? dot === 'power' ? 22 : 11 : 0;
-        const fruitReward = fruit ? Math.min(24, context.fruit!.points / 15) : 0;
+        const powerReward = config.frightenedFrames === 0 ? 11
+          : context.frightenedFramesRemaining > 90 ? -20
+            : (powerOpportunity.get(neighbor.index) ?? 0) > 0
+              ? 20 + (powerOpportunity.get(neighbor.index) ?? 0) * 8 : -25;
+        const reward = freshDot ? dot === 'power' ? powerReward : 11 : 0;
+        const fruitReward = fruit ? Math.min(100, 10 + context.fruit!.points / 10) : 0;
+        const fruitProgress = fruitGoal && !route.fruitCollected
+          && time < context.fruit!.framesRemaining
+          ? (fruitDistances![route.index] - fruitDistances![neighbor.index]) * 2 : 0;
+        const huntProgress = huntGoal && time < route.poweredUntil - moveFrames * 2
+          ? (huntDistances![route.index] - huntDistances![neighbor.index]) * 3 : 0;
         expanded.push({
           index: neighbor.index,
           time: time + (freshDot
             ? dot === 'power' ? POWER_DOT_FREEZE_FRAMES : NORMAL_DOT_FREEZE_FRAMES : 0),
-          score: route.score + reward + fruitReward
+          score: route.score + reward + fruitReward + fruitProgress + huntProgress
             - 1.5 - risk - backtrack - reverse
             - Math.min(120, staticThreat[neighbor.index]) * 0.035,
           firstDirection: route.firstDirection,
-          target: freshDot || fruit ? neighbor.index : route.target,
-          visited, poweredUntil,
+          target: fruitGoal && !route.fruitCollected ? fruitIndex
+            : huntTarget !== null && !fruitGoal ? huntTarget
+              : freshDot || fruit ? neighbor.index : route.target,
+          visited, poweredUntil, fruitCollected: route.fruitCollected || fruit,
         });
       }
     }

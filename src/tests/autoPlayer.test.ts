@@ -41,6 +41,20 @@ describe('debug auto-play', () => {
     expect(decision).toEqual({ direction: 'right', target: { x: 8, y: 5 } });
   });
 
+  it('takes reachable fruit while the frightened window covers the trip', () => {
+    const player = new PacSan();
+    player.x = at(12);
+    player.y = at(17);
+    const maze = new Maze();
+    maze.dots.clear();
+    maze.dots.set(tileIndex(1, 1), 'normal');
+
+    expect(chooseAutoDirection(player, [], maze, 'tas', {
+      round: 1, frightenedFramesRemaining: 180,
+      fruit: { visible: true, framesRemaining: 300, points: 100 },
+    })).toEqual({ direction: 'right', target: { x: 14, y: 17 } });
+  });
+
   it.each(['beginner', 'standard', 'expert', 'tas'] as AutoPlayLevel[])(
     '%s collects dots in the real maze without getting stuck', (level) => {
       const engine = new GameEngine();
@@ -67,10 +81,11 @@ describe('debug auto-play', () => {
     expect([...a.maze.dots]).toEqual([...b.maze.dots]);
   });
 
-  it('TAS clears four rounds without exhausting its lives on the fixed seed', () => {
+  it('TAS clears four rounds while using power cookies and collecting fruit', () => {
     const engine = new GameEngine();
     engine.toggleDebug();
     engine.setAutoPlayLevel('tas');
+    engine.setHistoryRecording(true);
     engine.start();
     let deaths = 0;
     let previousLives = engine.lives;
@@ -80,8 +95,12 @@ describe('debug auto-play', () => {
       if (engine.lives < previousLives) deaths += previousLives - engine.lives;
       previousLives = engine.lives;
     }
+    const events = engine.history.exportData().events;
     expect(engine.level).toBeGreaterThanOrEqual(5);
     expect(deaths).toBeLessThanOrEqual(3);
+    expect(events.filter(event => event.kind === 'ghost_eaten').length).toBeGreaterThanOrEqual(10);
+    expect(events.filter(event => event.kind === 'fruit_collected').length).toBeGreaterThanOrEqual(1);
+    expect(engine.score).toBeGreaterThanOrEqual(15000);
   }, 30000);
 
   it.each(['beginner', 'standard', 'expert', 'tas'] as AutoPlayLevel[])(
