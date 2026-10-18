@@ -66,9 +66,12 @@ export class Renderer {
       PLAYER_DYING: '', LEVEL_CLEAR: 'CLEAR', GAME_OVER: 'GAME OVER',
     }[engine.state];
     if (message) {
+      const width = message.length * 6 - 1;
+      const left = Math.round((SCREEN_WIDTH - width) / 2);
+      const top = 160;
       ctx.fillStyle = '#000000';
-      ctx.fillRect(66, 159, 92, 13);
-      pixelText(ctx, message, SCREEN_WIDTH / 2, 162, COLORS.player, 'center');
+      ctx.fillRect(left - 3, top - 2, width + 6, 11);
+      pixelText(ctx, message, SCREEN_WIDTH / 2, top, COLORS.player, 'center');
     }
     if (engine.debug) this.drawDebug(engine, flash);
     this.drawGhostScorePopups(engine);
