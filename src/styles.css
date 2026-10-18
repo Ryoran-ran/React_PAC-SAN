@@ -15,7 +15,7 @@ input:focus-visible, select:focus-visible { outline: 2px solid #ffdf00; outline-
 .edition > span:not(.status-light) { color: #464750; }
 .status-light { width: 5px; height: 5px; border-radius: 50%; background: #ffdf00; box-shadow: 0 0 10px #ffdf0030; }
 .game-layout { position: relative; min-height: 0; min-width: 0; padding: 12px 0; display: grid; grid-template-columns: minmax(0, 1fr) 268px; gap: clamp(20px, 4vw, 48px); }
-.start-screen { position: absolute; z-index: 10; inset: 12px 0; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(330px, 420px); align-items: center; gap: clamp(24px, 5vw, 80px); padding: clamp(22px, 5vw, 64px); overflow-y: auto; border: 1px solid #34353f; border-radius: 10px; background: radial-gradient(circle at 18% 50%, #282313 0, #121318 42%, #101116 78%); box-shadow: 0 16px 52px #000a; }
+.start-screen { position: absolute; z-index: 10; inset: 12px 0; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(330px, 420px); align-items: center; gap: clamp(24px, 5vw, 80px); padding: clamp(16px, 3vh, 24px) clamp(22px, 5vw, 64px); overflow-y: auto; border: 1px solid #34353f; border-radius: 10px; background: radial-gradient(circle at 18% 50%, #282313 0, #121318 42%, #101116 78%); box-shadow: 0 16px 52px #000a; }
 .start-intro { min-width: 0; }
 .start-kicker, .start-options-heading, .start-hint { font: 10px/1.4 Consolas, monospace; letter-spacing: 1.2px; color: #a3a4af; }
 .start-kicker { display: flex; align-items: center; gap: 9px; }
@@ -45,6 +45,11 @@ input:focus-visible, select:focus-visible { outline: 2px solid #ffdf00; outline-
 .mode-card.unavailable { opacity: .5; }
 .freeplay-settings { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 12px 0; padding: 11px 12px; border: 1px solid #3a3b45; border-radius: 5px; background: #14151b; }
 .freeplay-settings label { display: grid; gap: 6px; color: #b9b9c3; font-size: 10px; }
+.freeplay-settings .ghost-ai-setting { grid-column: 1 / -1; }
+.ghost-target-settings { grid-column: 1 / -1; min-width: 0; border-top: 1px solid #3a3b45; padding-top: 9px; }
+.ghost-target-settings summary { cursor: pointer; color: #dedee2; font-size: 11px; }
+.ghost-target-settings p { margin: 7px 0; color: #999aa5; font-size: 10px; }
+.ghost-target-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; margin-top: 10px; }
 .freeplay-settings input, .freeplay-settings select { width: 100%; min-height: 34px; padding: 5px 9px; border: 1px solid #575862; border-radius: 4px; background: #1d1e25; color: #f1f1e9; font: 13px Consolas, monospace; }
 .start-play { width: 100%; min-height: 45px; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 14px; padding: 10px 15px; border: 1px solid #ffdf00; border-radius: 5px; background: #ffdf00; color: #1a1a00; font-size: 13px; font-weight: 700; }
 .start-play:hover { background: #ffe83d; }

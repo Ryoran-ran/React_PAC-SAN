@@ -1,7 +1,7 @@
 import { DIRECTIONS, OPPOSITE, SCREEN_WIDTH, TILE_CENTER, TILE_SIZE, TUNNEL_ROW } from '../config/constants';
 import { GHOST_HOUSE_LIMITS, getLevelConfig } from '../config/levelTables';
 import { canMoveFromCenter, isAtTileCenter } from '../engine/CollisionSystem';
-import { chooseFrightenedDirection, chooseGhostDirection } from '../ai/GhostAI';
+import { chooseFrightenedDirection, chooseGhostDirection, type DirectionChoice } from '../ai/GhostAI';
 import type { GameRandom } from '../engine/Random';
 import type { Ghost } from '../entities/Ghost';
 import type { PacSan } from '../entities/PacSan';
@@ -96,7 +96,9 @@ export function ghostStepCount(ghost: Ghost, speedPercent = getLevelConfig(1).gh
 }
 
 export function moveGhost(ghost: Ghost, speedPercent = getLevelConfig(1).ghostSpeedPercent,
-  random?: GameRandom): boolean {
+  random?: GameRandom,
+  chooseNormalDirection?: (tile: { x: number; y: number }, direction: Ghost['direction'],
+    target: Ghost['targetTile']) => DirectionChoice): boolean {
   if (ghost.state === 'EATEN' && ghost.x === GHOST_HOUSE_LIMITS.exitX
     && ghost.y === GHOST_HOUSE_LIMITS.exitY) {
     ghost.houseState = 'RETURNING_HOME';
@@ -119,7 +121,9 @@ export function moveGhost(ghost: Ghost, speedPercent = getLevelConfig(1).ghostSp
       } else if (!ghost.pendingReverse) {
         const choice = ghost.state === 'FRIGHTENED' && random
           ? chooseFrightenedDirection(tile, ghost.direction, random)
-          : chooseGhostDirection(tile, ghost.direction, ghost.targetTile, ghost.state === 'EATEN');
+          : ghost.state === 'NORMAL' && chooseNormalDirection
+            ? chooseNormalDirection(tile, ghost.direction, ghost.targetTile)
+            : chooseGhostDirection(tile, ghost.direction, ghost.targetTile, ghost.state === 'EATEN');
         ghost.direction = choice.chosen;
         ghost.lastDecision = choice.decision;
       }

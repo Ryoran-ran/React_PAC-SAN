@@ -28,6 +28,8 @@ function captureFrame(engine: GameEngine, sequence: number) {
     playFrame: engine.playFrame,
     level: engine.level,
     gameMode: engine.gameMode,
+    ghostAI: engine.ghostAI,
+    ghostBehavior: engine.ghostBehavior,
     state: engine.state,
     score: engine.score,
     lives: engine.lives,

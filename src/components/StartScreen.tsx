@@ -1,6 +1,13 @@
 import type { FreePlaySettings, GameMode } from '../engine/GameModes';
+import type { GhostId } from '../entities/Ghost';
 
 type StartScreenView = 'modes' | 'freeplay-settings';
+const GHOST_NAMES: readonly { id: GhostId; name: string }[] = [
+  { id: 'blinky', name: 'アカベイ' },
+  { id: 'pinky', name: 'ピンキー' },
+  { id: 'inky', name: 'アオスケ' },
+  { id: 'clyde', name: 'グズタ' },
+];
 
 export function StartScreen({ gameOver, score, view, selectedMode, settings, onModeChange,
   onSettingsChange, onBack, onStart }: {
@@ -20,11 +27,11 @@ export function StartScreen({ gameOver, score, view, selectedMode, settings, onM
       <div className="start-kicker"><span className="status-light" /> SELECT MODE / PAC-SAN</div>
       <div className="start-mark" aria-hidden="true"><span className="start-pac" /><i /><i /><i /><i /></div>
       <h1 id="start-title">{configuring ? 'FREE PLAY' : gameOver ? 'GAME OVER' : 'PAC-SAN'}</h1>
-      <p>{configuring ? '遊びたいラウンドとゴーストの数を選択。'
+      <p>{configuring ? 'ラウンド・ゴーストの数・AIと行動を選択。'
         : gameOver ? `SCORE ${String(score).padStart(6, '0')}` : '迷路の先へ。遊び方を選んでスタート。'}</p>
       <div className="start-hint">{configuring
         ? 'Tab：設定と決定ボタン　·　Enter：盤面へ'
-        : '↑↓ / W S / 1 2：モード選択　·　Enter：盤面へ'}</div>
+        : '↑ / ↓ / 1 2 3 / N：モード選択　·　Enter：盤面へ'}</div>
     </div>
 
     <div className="start-options">
@@ -49,13 +56,49 @@ export function StartScreen({ gameOver, score, view, selectedMode, settings, onM
               <option value={3}>3体</option><option value={4}>4体</option>
             </select>
           </label>
+          <label className="ghost-ai-setting">ゴーストAI
+            <select value={settings.ghostAI}
+              onChange={(event) => onSettingsChange({ ...settings,
+                ghostAI: event.target.value === 'nightmare' ? 'nightmare' : 'arcade' })}>
+              <option value="arcade">通常</option>
+              <option value="nightmare">ナイトメア（連携して追跡）</option>
+            </select>
+          </label>
+          <label className="ghost-ai-setting">ゴーストの行動
+            <select value={settings.ghostBehavior}
+              onChange={(event) => onSettingsChange({ ...settings,
+                ghostBehavior: event.target.value === 'chase' ? 'chase'
+                  : event.target.value === 'scatter' ? 'scatter' : 'standard' })}>
+              <option value="standard">標準（選択したAIの既定動作）</option>
+              <option value="chase">追跡のみ</option>
+              <option value="scatter">巡回のみ</option>
+            </select>
+          </label>
+          <details className="ghost-target-settings">
+            <summary onKeyDown={(event) => {
+              if (event.key === 'Enter') event.stopPropagation();
+            }}>ゴースト別の追跡方法</summary>
+            <p>通常AIの追跡中に適用します。</p>
+            <div className="ghost-target-grid">
+              {GHOST_NAMES.map(({ id, name }) => <label key={id}>{name}
+                <select value={settings.ghostTargeting[id]}
+                  onChange={(event) => onSettingsChange({ ...settings,
+                    ghostTargeting: { ...settings.ghostTargeting,
+                      [id]: event.target.value as GhostId } })}>
+                  {GHOST_NAMES.map((choice) => <option key={choice.id} value={choice.id}>
+                    {choice.name}の追跡
+                  </option>)}
+                </select>
+              </label>)}
+            </div>
+          </details>
         </div>
         <p className="setup-footnote">フリープレイの得点はアーケードのハイスコアに反映されません。</p>
         <button type="button" className="start-play" onClick={onStart}>
           <span>設定を決めて盤面へ</span><span>ENTER →</span>
         </button>
       </> : <>
-      <div className="start-options-heading"><span>01 / GAME MODE</span><span>2 MODES AVAILABLE</span></div>
+      <div className="start-options-heading"><span>01 / GAME MODE</span><span>3 MODES AVAILABLE</span></div>
       <div className="mode-list" role="group" aria-label="ゲームモード">
         <button className={`mode-card${selectedMode === 'arcade' ? ' selected' : ''}`}
           type="button" aria-pressed={selectedMode === 'arcade'} onClick={(event) => {
@@ -68,13 +111,16 @@ export function StartScreen({ gameOver, score, view, selectedMode, settings, onM
           type="button" aria-pressed={selectedMode === 'freeplay'} onClick={(event) => {
             onModeChange('freeplay'); event.currentTarget.blur();
           }}>
-          <span className="mode-number">02</span><span className="mode-copy"><strong>フリープレイ</strong><small>残機無制限・開始ラウンドと敵の数を選択</small></span>
+          <span className="mode-number">02</span><span className="mode-copy"><strong>フリープレイ</strong><small>残機無制限・ラウンドと敵の行動を設定</small></span>
           <span className="mode-indicator" aria-hidden="true">{selectedMode === 'freeplay' ? '●' : '○'}</span>
         </button>
-        <div className="mode-card unavailable" aria-disabled="true">
-          <span className="mode-number">03</span><span className="mode-copy"><strong>ナイトメア <em>開発予定</em></strong><small>4体のゴーストが連携する新しいAI</small></span>
-          <span className="mode-indicator" aria-hidden="true">—</span>
-        </div>
+        <button className={`mode-card${selectedMode === 'nightmare' ? ' selected' : ''}`}
+          type="button" aria-pressed={selectedMode === 'nightmare'} onClick={(event) => {
+            onModeChange('nightmare'); event.currentTarget.blur();
+          }}>
+          <span className="mode-number">03</span><span className="mode-copy"><strong>ナイトメア</strong><small>アーケードルール・4体が連携して追い詰める</small></span>
+          <span className="mode-indicator" aria-hidden="true">{selectedMode === 'nightmare' ? '●' : '○'}</span>
+        </button>
       </div>
 
       <button type="button" className="start-play" onClick={onStart}>

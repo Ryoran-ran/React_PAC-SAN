@@ -11,6 +11,7 @@ import { createGhosts, type Ghost } from '../entities/Ghost';
 import { GhostHouse } from '../ai/GhostHouse';
 import { ModeScheduler } from '../ai/ModeScheduler';
 import { getGhostTarget } from '../ai/Targeting';
+import { chooseNightmareDirection, planNightmareTargets } from '../ai/NightmareAI';
 import { chooseAutoDirection, type AutoPlayLevel } from '../ai/AutoPlayer';
 import { Maze } from '../map/maze';
 import { moveGhost, movePlayer } from '../systems/MovementSystem';
@@ -22,7 +23,8 @@ import { DEFAULT_DEBUG_DISPLAY, type DebugDisplayKey, type DebugDisplayOptions }
 import { GameRandom } from './Random';
 import { GameHistory } from './GameHistory';
 import { DEFAULT_FREE_PLAY_SETTINGS, normalizeFreePlaySettings,
-  type FreePlaySettings, type GameMode } from './GameModes';
+  type FreePlaySettings, type FreePlaySettingsInput, type GameMode,
+  type GhostBehavior } from './GameModes';
 import type { SoundCue } from './SoundCue';
 
 export interface GhostScorePopup {
@@ -80,7 +82,7 @@ export class GameEngine {
     this.fruit.reset(this.level);
   }
 
-  configureStart(mode: GameMode, settings: FreePlaySettings = this.freePlaySettings): void {
+  configureStart(mode: GameMode, settings: FreePlaySettingsInput = this.freePlaySettings): void {
     if (this.state !== 'TITLE' && this.state !== 'GAME_OVER') return;
     this.selectedMode = mode;
     this.freePlaySettings = normalizeFreePlaySettings(settings);
@@ -105,6 +107,8 @@ export class GameEngine {
     this.resetForNewGame();
     this.history.recordEvent(this, 'game_start', {
       mode: this.gameMode, startLevel: this.level, ghostCount: this.ghosts.length,
+      ghostAI: this.ghostAI, ghostBehavior: this.ghostBehavior,
+      ghostTargeting: JSON.stringify(this.freePlaySettings.ghostTargeting),
     });
     this.history.recordEvent(this, 'round_start', { reason: 'new_game' });
     this.history.recordFrame(this);
@@ -124,12 +128,25 @@ export class GameEngine {
     this.beginRound(true, false);
   }
 
+  get ghostAI(): 'arcade' | 'nightmare' {
+    return this.gameMode === 'nightmare'
+      || (this.gameMode === 'freeplay' && this.freePlaySettings.ghostAI === 'nightmare')
+      ? 'nightmare' : 'arcade';
+  }
+
+  get ghostBehavior(): GhostBehavior {
+    return this.gameMode === 'freeplay' ? this.freePlaySettings.ghostBehavior : 'standard';
+  }
+
   private beginRound(newMaze: boolean, afterDeath: boolean): void {
     if (newMaze) this.maze = new Maze();
     this.player = new PacSan();
     this.ghosts = createGhosts().slice(0,
       this.gameMode === 'freeplay' ? this.freePlaySettings.ghostCount : 4);
-    this.modeScheduler.setSchedule(getLevelConfig(this.level).modeSchedule);
+    this.modeScheduler.setSchedule(this.ghostBehavior === 'standard'
+      ? getLevelConfig(this.level).modeSchedule
+      : [{ mode: this.ghostBehavior === 'chase' ? 'CHASE' : 'SCATTER', durationFrames: null }]);
+    for (const ghost of this.ghosts) ghost.mode = this.modeScheduler.mode;
     this.ghostHouse.reset(this.level);
     if (afterDeath) this.ghostHouse.onLifeLost();
     if (newMaze) this.fruit.reset(this.level);
@@ -247,7 +264,7 @@ export class GameEngine {
         }
         this.ghostCombo = 0;
       }
-    } else if (this.modeScheduler.tick()) {
+    } else if (this.modeScheduler.tick() && this.ghostAI !== 'nightmare') {
       for (const ghost of this.ghosts) ghost.requestReverse();
     }
     for (const ghost of this.ghosts) ghost.mode = this.modeScheduler.mode;
@@ -348,11 +365,18 @@ export class GameEngine {
     }
     if (this.resolveGhostContacts()) return;
     const blinky = this.ghosts.find((ghost) => ghost.id === 'blinky')!;
+    const nightmareTargets = this.ghostAI === 'nightmare' && this.ghostBehavior !== 'scatter'
+      ? planNightmareTargets(this.player, this.ghosts) : null;
     for (const ghost of this.ghosts) {
       if (ghost.houseState !== 'OUTSIDE') continue;
+      const chaseStyle = this.gameMode === 'freeplay'
+        ? this.freePlaySettings.ghostTargeting[ghost.id] : ghost.id;
       ghost.targetTile = ghost.state === 'EATEN'
         ? { x: 13, y: 11 }
-        : getGhostTarget(ghost, this.player, blinky, ghost.id === 'blinky' && this.elroyStage > 0);
+        : ghost.state === 'NORMAL' && nightmareTargets
+          ? nightmareTargets.get(ghost.id) ?? getGhostTarget(ghost, this.player, blinky)
+          : getGhostTarget(ghost, this.player, blinky, ghost.id === 'blinky'
+            && this.elroyStage > 0 && this.ghostBehavior !== 'scatter', chaseStyle);
     }
     for (const ghost of this.ghosts) {
       if (ghost.houseState !== 'OUTSIDE') continue;
@@ -365,7 +389,9 @@ export class GameEngine {
             : ghost.id === 'blinky' && this.elroyStage > 0
               ? config.elroySpeedPercent[this.elroyStage - 1] : config.ghostSpeedPercent;
       const previousDecision = ghost.lastDecision;
-      moveGhost(ghost, speed, this.random);
+      moveGhost(ghost, speed, this.random,
+        this.ghostAI === 'nightmare' && this.ghostBehavior !== 'scatter'
+          ? chooseNightmareDirection : undefined);
       if (ghost.lastDecision && ghost.lastDecision !== previousDecision) {
         this.history.recordEvent(this, 'ghost_decision', {
           ghost: ghost.id,
@@ -431,7 +457,7 @@ export class GameEngine {
         this.ghostEatFreezeFrames = 0;
         this.ghostScorePopups = [];
         this.fruitScorePopup = null;
-        if (this.gameMode === 'arcade') this.lives--;
+        if (this.gameMode !== 'freeplay') this.lives--;
         this.state = 'PLAYER_DYING';
         this.history.recordEvent(this, 'life_lost', {
           ghost: ghost.id, livesRemaining: this.lives,
@@ -450,8 +476,8 @@ export class GameEngine {
   private addScore(points: number): void {
     if (points <= 0) return;
     this.score += points;
-    if (this.gameMode === 'arcade') this.highScore = Math.max(this.highScore, this.score);
-    if (this.gameMode === 'arcade' && !this.extraLifeAwarded && this.score >= EXTRA_LIFE_SCORE) {
+    if (this.gameMode !== 'freeplay') this.highScore = Math.max(this.highScore, this.score);
+    if (this.gameMode !== 'freeplay' && !this.extraLifeAwarded && this.score >= EXTRA_LIFE_SCORE) {
       this.lives++;
       this.extraLifeAwarded = true;
       this.history.recordEvent(this, 'extra_life', { lives: this.lives });
@@ -462,8 +488,9 @@ export class GameEngine {
   snapshot() {
     return {
       state: this.state, score: this.score, highScore: this.highScore,
-      gameMode: this.gameMode, selectedMode: this.selectedMode,
-      freePlaySettings: { ...this.freePlaySettings },
+      gameMode: this.gameMode, selectedMode: this.selectedMode, ghostAI: this.ghostAI,
+      freePlaySettings: { ...this.freePlaySettings,
+        ghostTargeting: { ...this.freePlaySettings.ghostTargeting } },
       lives: this.lives, stateFramesRemaining: this.stateFramesRemaining,
       frightenedFramesRemaining: this.frightenedFramesRemaining,
       ghostCombo: this.ghostCombo, randomState: this.random.state,

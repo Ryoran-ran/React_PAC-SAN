@@ -16,8 +16,13 @@ export function attachKeyboard(engine: GameEngine, target: Window, actions: {
     const element = event.target as HTMLElement | null;
     if (element?.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(element?.tagName ?? '')) return;
     if (engine.state === 'TITLE' || engine.state === 'GAME_OVER') {
-      const menuMode = /^(ArrowUp|KeyW|Digit1)$/.test(event.code) ? 'arcade'
-        : /^(ArrowDown|KeyS|Digit2)$/.test(event.code) ? 'freeplay' : null;
+      const menuMode = /^(ArrowUp|KeyW)$/.test(event.code)
+        ? engine.selectedMode === 'nightmare' ? 'freeplay' : 'arcade'
+        : /^(ArrowDown|KeyS)$/.test(event.code)
+          ? engine.selectedMode === 'arcade' ? 'freeplay' : 'nightmare'
+          : event.code === 'Digit1' ? 'arcade'
+            : event.code === 'Digit2' ? 'freeplay'
+              : /^(Digit3|KeyN)$/.test(event.code) ? 'nightmare' : null;
       if (menuMode) {
         event.preventDefault();
         if (!event.repeat) {

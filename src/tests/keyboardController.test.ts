@@ -27,6 +27,10 @@ describe('keyboard controls', () => {
     press(target, 'ArrowUp');
     expect(engine.selectedMode).toBe('arcade');
     press(target, 'Digit2');
+    press(target, 'ArrowDown');
+    expect(engine.selectedMode).toBe('nightmare');
+    press(target, 'ArrowUp');
+    expect(engine.selectedMode).toBe('freeplay');
     expect(press(target, 'Enter').defaultPrevented).toBe(true);
     expect(engine.state).toBe('READY');
     expect(engine.gameMode).toBe('freeplay');
@@ -64,6 +68,24 @@ describe('keyboard controls', () => {
     expect(menuChanges).toEqual(['freeplay']);
     expect(startRequests).toBe(1);
     expect(engine.state).toBe('TITLE');
+    detach();
+  });
+
+  it('selects Nightmare with 3 without starting before Enter', () => {
+    const engine = new GameEngine();
+    const target = new EventTarget();
+    let startRequests = 0;
+    const detach = attachKeyboard(engine, target as unknown as Window, {
+      onMenuModeChange: (mode) => engine.configureStart(mode),
+      onStart: () => { startRequests++; },
+    });
+
+    press(target, 'Digit3');
+    expect(engine.selectedMode).toBe('nightmare');
+    expect(engine.state).toBe('TITLE');
+    expect(startRequests).toBe(0);
+    press(target, 'Enter');
+    expect(startRequests).toBe(1);
     detach();
   });
 

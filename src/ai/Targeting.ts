@@ -6,10 +6,6 @@ export function tileFromPosition(entity: { readonly x: number; readonly y: numbe
 }
 
 function tileAhead(origin: TilePoint, direction: Direction, distance: number): TilePoint {
-  if (direction === 'up') {
-    // Original overflow bug: moving up also offsets the target to the left.
-    return { x: origin.x - distance, y: origin.y - distance };
-  }
   const vector = DIRECTIONS[direction];
   return { x: origin.x + vector.x * distance, y: origin.y + vector.y * distance };
 }
@@ -44,6 +40,7 @@ export function getGhostTarget(
   player: { readonly x: number; readonly y: number; readonly direction: Direction },
   blinky: Ghost,
   elroy = false,
+  chaseStyle: GhostId = ghost.id,
 ): TilePoint {
   if (ghost.mode === 'SCATTER' && !(ghost.id === 'blinky' && elroy)) return { ...ghost.scatterTarget };
 
@@ -56,5 +53,5 @@ export function getGhostTarget(
     inky: () => getInkyTarget(playerTile, player.direction, blinkyTile),
     clyde: () => getClydeTarget(ghostTile, playerTile, ghost.scatterTarget),
   };
-  return targeting[ghost.id]();
+  return targeting[chaseStyle]();
 }

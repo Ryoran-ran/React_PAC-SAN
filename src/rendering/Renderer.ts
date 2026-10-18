@@ -2,7 +2,7 @@ import {
   COLORS, FRUIT_SCORE_POPUP_FRAMES, GHOST_EAT_FREEZE_FRAMES, GHOST_SCORE_POPUP_FRAMES, MAZE_COLUMNS,
   MAZE_OFFSET_Y, MAZE_ROWS, SCREEN_HEIGHT, SCREEN_WIDTH, TILE_CENTER, TILE_SIZE,
 } from '../config/constants';
-import { getFruitCounter, getLevelConfig } from '../config/levelTables';
+import { getLevelConfig } from '../config/levelTables';
 import type { GameEngine } from '../engine/GameEngine';
 import { canPlayerEnter } from '../map/tileRules';
 import { visibleDebugTarget } from './DebugTarget';
@@ -67,14 +67,11 @@ export class Renderer {
       if (!clearing) for (const ghost of engine.ghosts) drawGhost(ctx, ghost, flash);
       if (engine.ghostEatFreezeFrames === 0) drawPlayer(ctx, engine.player);
     } else drawDyingPlayer(ctx, engine.player, engine.stateFramesRemaining);
-    for (let life = 0; engine.gameMode === 'arcade' && life < Math.min(engine.lives - 1, 6); life++) {
+    for (let life = 0; engine.gameMode !== 'freeplay' && life < Math.min(engine.lives - 1, 6); life++) {
       drawLifeIcon(ctx, 12 + life * 15, SCREEN_HEIGHT - 7);
     }
-    const stageFruits = getFruitCounter(engine.level);
-    for (let index = 0; index < stageFruits.length; index++) {
-      drawFruit(ctx, stageFruits[index],
-        SCREEN_WIDTH - 12 - (stageFruits.length - index - 1) * 16, SCREEN_HEIGHT - 7);
-    }
+    pixelText(ctx, `ROUND ${String(engine.level).padStart(2, '0')}`,
+      SCREEN_WIDTH - 8, SCREEN_HEIGHT - 10, COLORS.text, 'right');
 
     const message = {
       TITLE: 'PUSH ENTER', READY: 'READY', PLAYING: '', PAUSED: 'PAUSED',
