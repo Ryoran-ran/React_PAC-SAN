@@ -1,4 +1,5 @@
-import { COLORS, MAZE_COLUMNS, MAZE_ROWS, TILE_SIZE } from '../config/constants';
+import arcadeMazeUrl from '../assets/arcade-maze.png';
+import { COLORS, MAZE_COLUMNS, MAZE_OFFSET_Y, MAZE_ROWS, SCREEN_HEIGHT, SCREEN_WIDTH, TILE_SIZE } from '../config/constants';
 import { tileType } from '../map/tileRules';
 
 type Point = { x: number; y: number };
@@ -8,8 +9,13 @@ const key = (p: Point) => `${p.x},${p.y}`;
 /** Builds visual contours once. These paths are never consulted by collision rules. */
 export class MazeRenderer {
   private contours: Point[][] = [];
+  private arcadeImage: HTMLImageElement | null = null;
 
   constructor() {
+    if (typeof Image !== 'undefined') {
+      this.arcadeImage = new Image();
+      this.arcadeImage.src = arcadeMazeUrl;
+    }
     const edges: Edge[] = [];
     const isWall = (x: number, y: number) => tileType(x, y) === 'wall';
     for (let y = 0; y < MAZE_ROWS; y++) {
@@ -64,25 +70,44 @@ export class MazeRenderer {
   }
 
   draw(context: CanvasRenderingContext2D): void {
-    context.strokeStyle = COLORS.wall;
-    context.lineWidth = 1;
-    context.lineJoin = 'round';
-    for (const contour of this.contours) {
-      context.beginPath();
-      for (let i = 0; i < contour.length; i++) {
-        const p = contour[i];
-        const prev = contour[(i + contour.length - 1) % contour.length];
-        const next = contour[(i + 1) % contour.length];
-        const before = { x: p.x - Math.sign(p.x - prev.x) * 2, y: p.y - Math.sign(p.y - prev.y) * 2 };
-        const after = { x: p.x + Math.sign(next.x - p.x) * 2, y: p.y + Math.sign(next.y - p.y) * 2 };
-        if (i === 0) context.moveTo(before.x, before.y);
-        else context.lineTo(before.x, before.y);
-        context.quadraticCurveTo(p.x, p.y, after.x, after.y);
+    // Pixel-exact transparent maze art from the arcade sprite reference. The
+    // generated contour below is a fallback until the image has loaded.
+    if (this.arcadeImage?.complete
+      && this.arcadeImage.naturalWidth === SCREEN_WIDTH
+      && this.arcadeImage.naturalHeight === SCREEN_HEIGHT) {
+      context.drawImage(this.arcadeImage, 0, -MAZE_OFFSET_Y);
+    } else {
+      context.fillStyle = COLORS.wall;
+      for (const contour of this.contours) {
+        const radiusAt = (index: number): number => {
+          const point = contour[index];
+          const before = contour[(index + contour.length - 1) % contour.length];
+          const after = contour[(index + 1) % contour.length];
+          const incomingLength = Math.abs(point.x - before.x) + Math.abs(point.y - before.y);
+          const outgoingLength = Math.abs(after.x - point.x) + Math.abs(after.y - point.y);
+          return Math.max(1, Math.min(3, Math.floor(Math.min(incomingLength, outgoingLength) / 2)));
+        };
+        for (let i = 0; i < contour.length; i++) {
+          const p = contour[i];
+          const prev = contour[(i + contour.length - 1) % contour.length];
+          const next = contour[(i + 1) % contour.length];
+          const incoming = { x: Math.sign(p.x - prev.x), y: Math.sign(p.y - prev.y) };
+          const outgoing = { x: Math.sign(next.x - p.x), y: Math.sign(next.y - p.y) };
+          const radius = radiusAt(i);
+          const previousRadius = radiusAt((i + contour.length - 1) % contour.length);
+          const start = { x: prev.x + incoming.x * previousRadius, y: prev.y + incoming.y * previousRadius };
+          const end = { x: p.x - incoming.x * radius, y: p.y - incoming.y * radius };
+          // Draw the wall as solid logical pixels until the image is ready.
+          context.fillRect(Math.min(start.x, end.x), Math.min(start.y, end.y),
+            Math.abs(end.x - start.x) + 1, Math.abs(end.y - start.y) + 1);
+          for (let step = 1; step <= radius; step++) {
+            context.fillRect(p.x - incoming.x * (radius - step) + outgoing.x * (step - 1),
+              p.y - incoming.y * (radius - step) + outgoing.y * (step - 1), 1, 1);
+          }
+        }
       }
-      context.closePath();
-      context.stroke();
+      context.fillStyle = COLORS.gate;
+      context.fillRect(13 * TILE_SIZE, 12 * TILE_SIZE + 5, 2 * TILE_SIZE, 2);
     }
-    context.fillStyle = COLORS.gate;
-    context.fillRect(13 * TILE_SIZE, 12 * TILE_SIZE + 2, 2 * TILE_SIZE, 2);
   }
 }

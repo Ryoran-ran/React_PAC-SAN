@@ -30,4 +30,22 @@ describe('fixed 60 Hz clock', () => {
     expect(updates).toBe(60);
     clock.advance(100100, () => updates++); expect(updates).toBe(66);
   });
+
+  it.each([0.5, 1, 2, 4] as const)('advances the same fixed simulation at %s× speed', speed => {
+    const clock = new FixedStepClock(); let updates = 0;
+    clock.setSpeed(speed);
+    clock.advance(0, () => updates++);
+    for (let i = 1; i <= 120; i++) clock.advance(i * 1000 / 120, () => updates++);
+    expect(updates).toBe(60 * speed);
+  });
+
+  it('changes speed without resetting partial frame progress', () => {
+    const clock = new FixedStepClock(); let updates = 0;
+    clock.advance(0, () => updates++);
+    clock.advance(1000 / 120, () => updates++);
+    expect(updates).toBe(0);
+    clock.setSpeed(0.5);
+    clock.advance(1000 / 40, () => updates++);
+    expect(updates).toBe(1);
+  });
 });

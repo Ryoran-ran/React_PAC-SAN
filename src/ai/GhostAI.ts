@@ -1,6 +1,7 @@
 import { DIRECTIONS, OPPOSITE, type Direction } from '../config/constants';
 import type { GhostDecision, TilePoint } from '../entities/Ghost';
 import { canGhostEnter, isGhostNoUpTile } from '../map/tileRules';
+import type { GameRandom } from '../engine/Random';
 
 export const GHOST_TIE_BREAK_ORDER: readonly Direction[] = ['up', 'left', 'down', 'right'];
 
@@ -24,8 +25,14 @@ export function chooseGhostDirection(
   tile: TilePoint,
   currentDirection: Direction,
   target: TilePoint,
+  ignoreNoUp = false,
 ): DirectionChoice {
-  const available = availableDirections(tile);
+  const available = ignoreNoUp
+    ? GHOST_TIE_BREAK_ORDER.filter((direction) => {
+      const vector = DIRECTIONS[direction];
+      return canGhostEnter(tile.x + vector.x, tile.y + vector.y);
+    })
+    : availableDirections(tile);
   const reverse = OPPOSITE[currentDirection];
   const forwardChoices = available.filter((direction) => direction !== reverse);
   const candidates = forwardChoices.length > 0 ? forwardChoices : available;
@@ -46,4 +53,21 @@ export function chooseGhostDirection(
     chosen,
     decision: { tile: { ...tile }, candidates: [...candidates], chosen },
   };
+}
+
+export function chooseFrightenedDirection(
+  tile: TilePoint, currentDirection: Direction, random: GameRandom,
+): DirectionChoice {
+  const clockwise: readonly Direction[] = ['up', 'right', 'down', 'left'];
+  const reverse = OPPOSITE[currentDirection];
+  const available = clockwise.filter((direction) => {
+    const vector = DIRECTIONS[direction];
+    return canGhostEnter(tile.x + vector.x, tile.y + vector.y);
+  });
+  const candidates = available.filter((direction) => direction !== reverse);
+  const choices = candidates.length ? candidates : available;
+  const start = random.nextInt(clockwise.length);
+  const chosen = Array.from({ length: clockwise.length }, (_, offset) => clockwise[(start + offset) % clockwise.length])
+    .find((direction) => choices.includes(direction)) ?? reverse;
+  return { chosen, decision: { tile: { ...tile }, candidates: [...choices], chosen } };
 }

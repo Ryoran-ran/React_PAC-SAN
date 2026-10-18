@@ -1,8 +1,4 @@
-import {
-  GHOST_HOUSE_IDLE_RELEASE_FRAMES,
-  GHOST_HOUSE_LIMITS,
-  GHOST_HOUSE_RELEASE_DOTS,
-} from '../config/levelTables';
+import { GHOST_HOUSE_LIMITS, getLevelConfig } from '../config/levelTables';
 import type { Ghost } from '../entities/Ghost';
 import { ghostStepCount } from '../systems/MovementSystem';
 
@@ -11,10 +7,20 @@ const RELEASE_ORDER = ['pinky', 'inky', 'clyde'] as const;
 export class GhostHouse {
   public dotCounter = 0;
   public idleFrames = 0;
+  private level = 1;
+  private useGlobalCounter = false;
 
-  public reset(): void {
+  public reset(level = this.level): void {
+    this.level = level;
     this.dotCounter = 0;
     this.idleFrames = 0;
+    this.useGlobalCounter = false;
+  }
+
+  public onLifeLost(): void {
+    this.dotCounter = 0;
+    this.idleFrames = 0;
+    this.useGlobalCounter = true;
   }
 
   public onDotConsumed(): void {
@@ -30,6 +36,7 @@ export class GhostHouse {
     for (const ghost of ghosts) {
       if (ghost.houseState === 'LEAVING_HOME') this.advanceLeavingGhost(ghost);
       else if (ghost.houseState === 'PACING_HOME') this.advancePacingGhost(ghost);
+      else if (ghost.houseState === 'RETURNING_HOME') this.advanceReturningGhost(ghost);
     }
   }
 
@@ -39,17 +46,22 @@ export class GhostHouse {
       .find((ghost) => ghost?.houseState === 'PACING_HOME');
     if (!next) return;
 
-    const reachedDotLimit = this.dotCounter >= GHOST_HOUSE_RELEASE_DOTS[next.id];
-    const timedOut = this.idleFrames >= GHOST_HOUSE_IDLE_RELEASE_FRAMES;
+    const config = getLevelConfig(this.level);
+    const limit = this.useGlobalCounter
+      ? { blinky: 0, pinky: 7, inky: 17, clyde: 32 }[next.id]
+      : config.ghostReleaseDots[next.id];
+    const reachedDotLimit = this.dotCounter >= limit;
+    const timedOut = this.idleFrames >= config.ghostHouseIdleFrames;
     if (!reachedDotLimit && !timedOut) return;
 
     next.houseState = 'LEAVING_HOME';
     next.lastDecision = null;
+    if (this.useGlobalCounter && next.id === 'clyde' && this.dotCounter === 32) this.useGlobalCounter = false;
     if (timedOut && !reachedDotLimit) this.idleFrames = 0;
   }
 
   private advancePacingGhost(ghost: Ghost): void {
-    const steps = ghostStepCount(ghost);
+    const steps = ghostStepCount(ghost, getLevelConfig(this.level).ghostSpeedPercent);
     ghost.moving = false;
     for (let step = 0; step < steps; step++) {
       if (ghost.y <= GHOST_HOUSE_LIMITS.upperY) ghost.direction = 'down';
@@ -61,7 +73,7 @@ export class GhostHouse {
   }
 
   private advanceLeavingGhost(ghost: Ghost): void {
-    const steps = ghostStepCount(ghost);
+    const steps = ghostStepCount(ghost, getLevelConfig(this.level).ghostSpeedPercent);
     ghost.moving = false;
     for (let step = 0; step < steps; step++) {
       if (ghost.x !== GHOST_HOUSE_LIMITS.exitX) {
@@ -78,6 +90,30 @@ export class GhostHouse {
         ghost.y = GHOST_HOUSE_LIMITS.exitY;
         ghost.direction = 'left';
         ghost.houseState = 'OUTSIDE';
+        ghost.lastDecision = null;
+        break;
+      }
+    }
+  }
+
+  private advanceReturningGhost(ghost: Ghost): void {
+    const steps = ghostStepCount(ghost, 200);
+    ghost.moving = false;
+    for (let step = 0; step < steps; step++) {
+      if (ghost.x !== GHOST_HOUSE_LIMITS.exitX) {
+        ghost.direction = ghost.x < GHOST_HOUSE_LIMITS.exitX ? 'right' : 'left';
+        ghost.x += ghost.direction === 'right' ? 1 : -1;
+      } else {
+        ghost.direction = 'down';
+        ghost.y++;
+      }
+      ghost.stepsMoved++;
+      ghost.moving = true;
+      if (ghost.y >= GHOST_HOUSE_LIMITS.lowerY) {
+        ghost.y = GHOST_HOUSE_LIMITS.lowerY;
+        ghost.state = 'NORMAL';
+        ghost.houseState = 'LEAVING_HOME';
+        ghost.direction = 'up';
         ghost.lastDecision = null;
         break;
       }
