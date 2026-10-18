@@ -1,4 +1,4 @@
-import { DIRECTIONS, OPPOSITE, SCREEN_WIDTH, TILE_SIZE, TUNNEL_ROW } from '../config/constants';
+import { DIRECTIONS, OPPOSITE, SCREEN_WIDTH, TILE_CENTER, TILE_SIZE, TUNNEL_ROW } from '../config/constants';
 import { GHOST_HOUSE_LIMITS, getLevelConfig } from '../config/levelTables';
 import { canMoveFromCenter, isAtTileCenter } from '../engine/CollisionSystem';
 import { chooseFrightenedDirection, chooseGhostDirection } from '../ai/GhostAI';
@@ -13,7 +13,7 @@ export function speedSteps(frame: number, percent: number): number {
 }
 
 export function movePlayer(player: PacSan, speedPercent = getLevelConfig(1).playerSpeedPercent,
-  onReachCenter?: () => boolean): boolean {
+  onDotCheck?: () => boolean): boolean {
   player.moving = false;
   if (player.freezeFrames > 0) {
     player.freezeFrames--;
@@ -22,18 +22,36 @@ export function movePlayer(player: PacSan, speedPercent = getLevelConfig(1).play
   const steps = speedSteps(player.movementFrame++, speedPercent);
   for (let step = 0; step < steps; step++) {
     // Reversals are allowed immediately, including between tile centers.
-    if (player.requestedDirection === OPPOSITE[player.direction]) {
+    if (!player.turning && player.requestedDirection === OPPOSITE[player.direction]) {
       player.direction = player.requestedDirection;
     }
-    if (isAtTileCenter(player)) {
+    if (!player.turning && player.requestedDirection !== player.direction
+      && player.requestedDirection !== OPPOSITE[player.direction]) {
+      const turn = availablePlayerTurn(player);
+      if (turn) {
+        player.turning = turn;
+        player.direction = player.requestedDirection;
+      }
+    }
+    if (!player.turning && isAtTileCenter(player)) {
       if (canMoveFromCenter(player, player.requestedDirection)) {
         player.direction = player.requestedDirection;
       }
       if (!canMoveFromCenter(player, player.direction)) break;
     }
     const vector = DIRECTIONS[player.direction];
-    player.x += vector.x;
-    player.y += vector.y;
+    if (player.turning) {
+      const { centerX, centerY, from } = player.turning;
+      const oldAxis = DIRECTIONS[from].x !== 0 ? 'x' : 'y';
+      const remaining = (oldAxis === 'x' ? centerX - player.x : centerY - player.y);
+      player[oldAxis] += Math.sign(remaining);
+      player.x += vector.x;
+      player.y += vector.y;
+      if (player[oldAxis] === (oldAxis === 'x' ? centerX : centerY)) player.turning = null;
+    } else {
+      player.x += vector.x;
+      player.y += vector.y;
+    }
     // Keep a full-width, continuous tunnel, including sprite wrapping in Renderer.
     if (Math.floor(player.y / TILE_SIZE) === TUNNEL_ROW) {
       player.x = ((player.x % SCREEN_WIDTH) + SCREEN_WIDTH) % SCREEN_WIDTH;
@@ -41,10 +59,35 @@ export function movePlayer(player: PacSan, speedPercent = getLevelConfig(1).play
     player.steps++;
     player.moving = true;
     // A faster level can cross a center on the first of two pixel steps.
-    // Let scoring stop movement there so the dot freeze begins at that pixel.
-    if (isAtTileCenter(player) && onReachCenter?.()) break;
+    // A diagonal turn also needs a check before it bypasses that center.
+    if ((player.turning || isAtTileCenter(player)) && onDotCheck?.()) break;
   }
   return player.moving;
+}
+
+/** The arcade permits a perpendicular turn 3/4 pixels before or after a center. */
+function availablePlayerTurn(player: PacSan): PacSan['turning'] {
+  const from = player.direction;
+  const axis = DIRECTIONS[from].x !== 0 ? 'x' : 'y';
+  const crossAxis = axis === 'x' ? 'y' : 'x';
+  if (player[crossAxis] % TILE_SIZE !== TILE_CENTER) return null;
+  const coordinate = player[axis];
+  const lowerCenter = Math.floor((coordinate - TILE_CENTER) / TILE_SIZE) * TILE_SIZE + TILE_CENTER;
+  const centers = DIRECTIONS[from][axis] > 0
+    ? [lowerCenter, lowerCenter + TILE_SIZE] : [lowerCenter + TILE_SIZE, lowerCenter];
+  for (const center of centers) {
+    const signedDistance = (coordinate - center) * DIRECTIONS[from][axis];
+    const postLimit = from === 'right' || from === 'down' ? 4 : 3;
+    const preLimit = from === 'left' || from === 'up' ? 4 : 3;
+    if (signedDistance < -preLimit || signedDistance > postLimit) continue;
+    const junction = axis === 'x'
+      ? { x: center, y: player.y } : { x: player.x, y: center };
+    if (!canMoveFromCenter(junction, player.requestedDirection)) continue;
+    // The center step is an ordinary turn; diagonal correction is unnecessary.
+    if (signedDistance === 0) return null;
+    return { from, centerX: junction.x, centerY: junction.y };
+  }
+  return null;
 }
 
 export function ghostStepCount(ghost: Ghost, speedPercent = getLevelConfig(1).ghostSpeedPercent): number {

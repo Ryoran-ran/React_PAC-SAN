@@ -41,6 +41,24 @@ describe('Phase 3 game systems', () => {
     expect(engine.player.freezeFrames).toBe(1);
   });
 
+  it('collects a junction dot while making an early diagonal turn', () => {
+    const engine = playing();
+    engine.ghosts = [];
+    engine.maze.dots.clear();
+    engine.maze.dots.set(tileIndex(6, 1), 'normal');
+    engine.maze.dots.set(tileIndex(6, 2), 'normal');
+    engine.player.x = at(6) - 3;
+    engine.player.y = at(1);
+    engine.player.direction = 'right';
+    engine.player.requestedDirection = 'down';
+    engine.update();
+    expect(engine.player.x).toBe(at(6) - 2);
+    expect(engine.player.y).toBe(at(1) + 1);
+    expect(engine.maze.remainingDots).toBe(1);
+    expect(engine.score).toBe(10);
+    expect(engine.player.freezeFrames).toBe(1);
+  });
+
   it('activates a power dot crossed midway through a two-pixel update', () => {
     const engine = playing();
     engine.level = 5;

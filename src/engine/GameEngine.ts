@@ -253,11 +253,13 @@ export class GameEngine {
       } else this.autoDecisionCenter = null;
     };
     decideAutoAtCenter();
-    // Consume at each corridor center crossed, including the first pixel of a
-    // two-pixel update. Keep the stationary-center check for zero-step frames.
+    // Check each center crossed, including the first pixel of a two-pixel
+    // update; a diagonal corner may also cross a dot tile off-center.
     let completedLevel = false;
-    const consumeAtCenter = (): boolean => {
-      if (!isAtTileCenter(this.player)) return false;
+    const consumeAtPlayer = (): boolean => {
+      // A pre-turn crosses the junction tile diagonally without visiting its
+      // center pixel. It may still eat the dot in that occupied tile.
+      if (!isAtTileCenter(this.player) && !this.player.turning) return false;
       const dot = this.maze.consumeAt(this.player.x, this.player.y);
       if (dot) {
         this.addScore(pointsForDot(dot));
@@ -290,12 +292,12 @@ export class GameEngine {
     };
     movePlayer(this.player, this.frightenedFramesRemaining > 0
       ? config.frightenedPlayerSpeedPercent : config.playerSpeedPercent, () => {
-        const consumed = consumeAtCenter();
+        const consumed = consumeAtPlayer();
         if (!consumed) decideAutoAtCenter();
         return consumed;
       });
     if (completedLevel) return;
-    consumeAtCenter();
+    consumeAtPlayer();
     if (completedLevel) return;
 
     const fruitPoints = this.fruit.collectAt(this.player.x, this.player.y);
@@ -444,6 +446,7 @@ export class GameEngine {
       collectedDots: TOTAL_DOTS - this.maze.remainingDots,
       player: {
         ...this.player,
+        turning: this.player.turning ? { ...this.player.turning } : null,
         tileX: Math.floor(this.player.x / TILE_SIZE),
         tileY: Math.floor(this.player.y / TILE_SIZE),
       },

@@ -9,4 +9,5 @@ export class PacSan {
   movementFrame = 0;
   steps = 0;
   moving = false;
+  turning: { from: Direction; centerX: number; centerY: number } | null = null;
 }

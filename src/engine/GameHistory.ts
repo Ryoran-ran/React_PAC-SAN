@@ -44,6 +44,7 @@ function captureFrame(engine: GameEngine, sequence: number) {
       requestedDirection: engine.player.requestedDirection,
       freezeFrames: engine.player.freezeFrames,
       moving: engine.player.moving,
+      turning: engine.player.turning ? { ...engine.player.turning } : null,
     },
     autoPlay: {
       level: engine.autoPlayLevel,

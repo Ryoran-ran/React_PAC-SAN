@@ -33,7 +33,10 @@ export class Renderer {
     pixelText(ctx, String(engine.highScore).padStart(6, '0'), 136, 12, COLORS.text, 'center');
     ctx.save();
     ctx.translate(0, MAZE_OFFSET_Y);
-    this.maze.draw(ctx);
+    const clearing = engine.state === 'LEVEL_CLEAR';
+    const whiteWalls = clearing && engine.stateFramesRemaining <= 60
+      && Math.floor(engine.stateFramesRemaining / 8) % 2 === 0;
+    this.maze.draw(ctx, whiteWalls);
     // Draw every cookie in backing-store pixels. Fractional CSS scaling would
     // otherwise turn identical 2×2 cookies into different visible sizes.
     const cookieTransform = ctx.getTransform();
@@ -61,7 +64,7 @@ export class Renderer {
       && engine.frightenedFramesRemaining <= config.frightenedFlashes * 24
       && Math.floor(engine.frightenedFramesRemaining / 12) % 2 === 0;
     if (engine.state !== 'PLAYER_DYING') {
-      for (const ghost of engine.ghosts) drawGhost(ctx, ghost, flash);
+      if (!clearing) for (const ghost of engine.ghosts) drawGhost(ctx, ghost, flash);
       if (engine.ghostEatFreezeFrames === 0) drawPlayer(ctx, engine.player);
     } else drawDyingPlayer(ctx, engine.player, engine.stateFramesRemaining);
     for (let life = 0; life < Math.min(engine.lives - 1, 6); life++) {
@@ -75,7 +78,7 @@ export class Renderer {
 
     const message = {
       TITLE: 'PUSH ENTER', READY: 'READY', PLAYING: '', PAUSED: 'PAUSED',
-      PLAYER_DYING: '', LEVEL_CLEAR: 'CLEAR', GAME_OVER: 'GAME OVER',
+      PLAYER_DYING: '', LEVEL_CLEAR: '', GAME_OVER: 'GAME OVER',
     }[engine.state];
     if (message) {
       const width = message.length * 6 - 1;
