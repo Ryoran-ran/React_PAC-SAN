@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { SoundEngine } from './audio/SoundEngine';
 import { GameCanvas } from './components/GameCanvas';
 import { FruitPickupHistory } from './components/FruitPickupHistory';
@@ -10,6 +10,7 @@ import type { DebugDisplayKey } from './engine/DebugDisplay';
 import type { AutoPlayLevel } from './ai/AutoPlayer';
 import type { GameState } from './engine/GameState';
 import { loadHighScore } from './storage/highScore';
+import { loadDebugPreferences, saveDebugPreferences } from './storage/debugPreferences';
 
 const STATE_LABELS: Record<GameState, string> = {
   TITLE: '開始待ち', READY: '準備中', PLAYING: 'プレイ中', PAUSED: '一時停止',
@@ -17,7 +18,17 @@ const STATE_LABELS: Record<GameState, string> = {
 };
 
 export default function App() {
-  const [engine] = useState(() => new GameEngine(loadHighScore()));
+  const [engine] = useState(() => {
+    const game = new GameEngine(loadHighScore());
+    const preferences = loadDebugPreferences();
+    if (preferences.debug) game.toggleDebug();
+    for (const key of Object.keys(preferences.debugDisplay) as DebugDisplayKey[]) {
+      game.setDebugDisplayOption(key, preferences.debugDisplay[key]);
+    }
+    if (preferences.debug && preferences.autoPlayLevel) game.setAutoPlayLevel(preferences.autoPlayLevel);
+    if (preferences.historyRecording) game.setHistoryRecording(true);
+    return game;
+  });
   const [soundEnabled, setSoundEnabled] = useState(() => {
     try { return localStorage.getItem('pac-san-sound-enabled') !== 'false'; }
     catch { return true; }
@@ -25,6 +36,20 @@ export default function App() {
   const [sound] = useState(() => new SoundEngine(soundEnabled));
   const [snapshot, setSnapshot] = useState(() => engine.snapshot());
   const [mobileInfoOpen, setMobileInfoOpen] = useState(false);
+  const storedDebugSettings = JSON.stringify({
+    debug: snapshot.debug,
+    debugDisplay: snapshot.debugDisplay,
+    autoPlayLevel: snapshot.autoPlayLevel,
+    historyRecording: snapshot.history.recording,
+  });
+  useEffect(() => {
+    saveDebugPreferences({
+      debug: snapshot.debug,
+      debugDisplay: snapshot.debugDisplay,
+      autoPlayLevel: snapshot.autoPlayLevel,
+      historyRecording: snapshot.history.recording,
+    });
+  }, [storedDebugSettings]);
   const canPause = ['READY', 'PLAYING', 'PAUSED'].includes(snapshot.state);
   const canStart = snapshot.state === 'TITLE' || snapshot.state === 'GAME_OVER';
   const mobileAction = () => {

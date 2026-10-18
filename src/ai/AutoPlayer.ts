@@ -7,7 +7,7 @@ import type { Ghost, TilePoint } from '../entities/Ghost';
 import type { PacSan } from '../entities/PacSan';
 import { tileIndex, type Maze } from '../map/maze';
 import { canPlayerEnter } from '../map/tileRules';
-import { moveGhost } from '../systems/MovementSystem';
+import { moveGhost, movePlayer } from '../systems/MovementSystem';
 import { FRUIT_POSITION } from '../systems/FruitSystem';
 
 export type AutoPlayLevel = 'beginner' | 'standard' | 'expert' | 'tas';
@@ -124,6 +124,7 @@ export interface TasContext {
   readonly fruit?: { readonly visible: boolean; readonly framesRemaining: number; readonly points: number };
   readonly elroyStage?: 0 | 1 | 2;
   readonly committedTarget?: TilePoint | null;
+  readonly recentCenters?: readonly TilePoint[];
 }
 
 interface ForecastGhost {
@@ -145,10 +146,16 @@ interface TasRoute {
 const TAS_HORIZON_TILES = 9;
 const TAS_BEAM_WIDTH = 14;
 
-function ghostForecast(ghosts: readonly Ghost[], context: TasContext,
+function ghostForecast(player: PacSan, ghosts: readonly Ghost[], context: TasContext,
   frames: number): ForecastGhost[][] {
   const config = getLevelConfig(context.round);
   const copies = ghosts.map((ghost) => Object.assign(Object.create(Object.getPrototypeOf(ghost)) as Ghost, ghost));
+  // From round five, Elroy can keep gaining on a player in a long corridor.
+  const fastElroy = context.round >= 5 && context.elroyStage === 2;
+  const projectedPlayer = { ...player };
+  projectedPlayer.requestedDirection = player.direction;
+  const playerSpeed = context.frightenedFramesRemaining > 0
+    ? config.frightenedPlayerSpeedPercent : config.playerSpeedPercent;
   const result: ForecastGhost[][] = [];
   for (let frame = 0; frame <= frames; frame++) {
     result.push(copies.map((ghost) => ({
@@ -157,8 +164,12 @@ function ghostForecast(ghosts: readonly Ghost[], context: TasContext,
         && (ghost.state === 'NORMAL' || frame >= context.frightenedFramesRemaining),
     })));
     if (frame === frames) break;
+    if (fastElroy) movePlayer(projectedPlayer, playerSpeed);
     for (const ghost of copies) {
       if (ghost.houseState !== 'OUTSIDE' || ghost.state === 'EATEN') continue;
+      if (fastElroy && ghost.id === 'blinky') {
+        ghost.targetTile = tileOf(projectedPlayer);
+      }
       if (ghost.state === 'FRIGHTENED' && frame + 1 >= context.frightenedFramesRemaining) {
         ghost.state = 'NORMAL';
       }
@@ -168,8 +179,8 @@ function ghostForecast(ghosts: readonly Ghost[], context: TasContext,
         : inTunnel ? config.ghostTunnelSpeedPercent
           : ghost.id === 'blinky' && context.elroyStage
             ? config.elroySpeedPercent[context.elroyStage - 1] : config.ghostSpeedPercent;
-      // The visible target remains a useful short-term forecast. Replan at
-      // the next center rather than assuming this path indefinitely.
+      // Keep other ghosts' visible targets for this short horizon. Once
+      // Blinky is much faster, project his pursuit of the moving player.
       moveGhost(ghost, speed);
     }
   }
@@ -275,10 +286,14 @@ function chooseTasDirection(player: PacSan, ghosts: readonly Ghost[], maze: Maze
     if (route) return route;
   }
   // MovementSystem advances at speed / 80 pixels per frame on average.
-  const forecast = ghostForecast(ghosts, context,
+  const forecast = ghostForecast(player, ghosts, context,
     player.freezeFrames + TAS_HORIZON_TILES * (moveFrames + 3) + 1);
   const staticThreat = threatCosts(ghosts, POLICIES.tas);
   const dotDistances = nearestDotDistances(maze);
+  const committedIndex = context.committedTarget
+    ? tileIndex(context.committedTarget.x, context.committedTarget.y) : -1;
+  const committedDistances = !fruitGoal && !huntGoal && maze.dots.has(committedIndex)
+    ? graphDistances(committedIndex) : null;
   // Keep power cookies in reserve when no ghost is close enough to exploit them.
   const powerOpportunity = new Map<number, number>();
   if (config.frightenedFrames > 0) {
@@ -300,6 +315,14 @@ function chooseTasDirection(player: PacSan, ghosts: readonly Ghost[], maze: Maze
     fruitCollected: false,
   }));
   if (routes.length === 0) return null;
+  const recent = context.recentCenters ?? [];
+  const previous = recent[recent.length - 1];
+  const beforePrevious = recent[recent.length - 2];
+  const thirdPrevious = recent[recent.length - 3];
+  const repeatedPair = routes.length > 1 && previous && beforePrevious && thirdPrevious
+    && previous.x === thirdPrevious.x && previous.y === thirdPrevious.y
+    && beforePrevious.x === playerTile.x && beforePrevious.y === playerTile.y;
+  const loopBackIndex = repeatedPair ? tileIndex(previous.x, previous.y) : -1;
 
   for (let depth = 0; depth < TAS_HORIZON_TILES; depth++) {
     const expanded: TasRoute[] = [];
@@ -320,6 +343,14 @@ function chooseTasDirection(player: PacSan, ghosts: readonly Ghost[], maze: Maze
         visited.add(neighbor.index);
         const backtrack = route.visited.has(neighbor.index) ? 4 : 0;
         const reverse = depth === 0 && neighbor.direction === OPPOSITE[player.direction] ? 1 : 0;
+        const loopBack = depth === 0 && neighbor.index === loopBackIndex ? 20 : 0;
+        // The beam may score a route that starts with a detour and later
+        // returns here. Replanning at that next tile otherwise repeats the
+        // detour forever, so give the first step credit for approaching the
+        // still-uncollected goal chosen on the previous decision.
+        const committedProgress = depth === 0 && committedDistances
+          && Number.isFinite(committedDistances[start])
+          ? (committedDistances[start] - committedDistances[neighbor.index]) * 8 : 0;
         const powerReward = config.frightenedFrames === 0 ? 11
           : context.frightenedFramesRemaining > 90 ? -20
             : (powerOpportunity.get(neighbor.index) ?? 0) > 0
@@ -336,7 +367,8 @@ function chooseTasDirection(player: PacSan, ghosts: readonly Ghost[], maze: Maze
           time: time + (freshDot
             ? dot === 'power' ? POWER_DOT_FREEZE_FRAMES : NORMAL_DOT_FREEZE_FRAMES : 0),
           score: route.score + reward + fruitReward + fruitProgress + huntProgress
-            - 1.5 - risk - backtrack - reverse
+            + committedProgress
+            - 1.5 - risk - backtrack - reverse - loopBack
             - Math.min(120, staticThreat[neighbor.index]) * 0.035,
           firstDirection: route.firstDirection,
           target: fruitGoal && !route.fruitCollected ? fruitIndex

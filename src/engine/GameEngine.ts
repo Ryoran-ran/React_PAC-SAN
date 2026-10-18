@@ -67,6 +67,7 @@ export class GameEngine {
   onSound: ((cue: SoundCue) => void) | null = null;
   readonly history = new GameHistory();
   private autoDecisionCenter: string | null = null;
+  private autoRecentCenters: { x: number; y: number }[] = [];
   private pausedFrom: 'READY' | 'PLAYING' = 'PLAYING';
 
   constructor(highScore = 0) {
@@ -110,6 +111,7 @@ export class GameEngine {
     this.fruitScorePopup = null;
     this.autoPlayTarget = null;
     this.autoDecisionCenter = null;
+    this.autoRecentCenters = [];
     this.state = 'READY';
   }
 
@@ -129,6 +131,7 @@ export class GameEngine {
     this.autoPlayLevel = level;
     this.autoPlayTarget = null;
     this.autoDecisionCenter = null;
+    this.autoRecentCenters = [];
     if (level) this.player.requestedDirection = this.player.direction;
   }
 
@@ -228,6 +231,7 @@ export class GameEngine {
             fruit: this.fruit,
             elroyStage: this.elroyStage,
             committedTarget: this.autoPlayLevel === 'tas' ? this.autoPlayTarget : null,
+            recentCenters: this.autoRecentCenters,
           });
           if (decision) {
             this.player.requestedDirection = decision.direction;
@@ -240,6 +244,11 @@ export class GameEngine {
             targetY: decision?.target.y ?? null,
           });
           this.autoDecisionCenter = center;
+          this.autoRecentCenters.push({
+            x: Math.floor(this.player.x / TILE_SIZE),
+            y: Math.floor(this.player.y / TILE_SIZE),
+          });
+          if (this.autoRecentCenters.length > 3) this.autoRecentCenters.shift();
         }
       } else this.autoDecisionCenter = null;
     };
