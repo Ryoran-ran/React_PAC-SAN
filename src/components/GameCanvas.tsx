@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import type { SoundEngine } from '../audio/SoundEngine';
 import { SCREEN_HEIGHT, SCREEN_WIDTH } from '../config/constants';
 import type { GameEngine } from '../engine/GameEngine';
 import { GameLoop } from '../engine/GameLoop';
@@ -8,7 +9,9 @@ import { saveHighScore } from '../storage/highScore';
 
 type Snapshot = ReturnType<GameEngine['snapshot']>;
 
-export function GameCanvas({ engine, onSnapshot }: { engine: GameEngine; onSnapshot: (snapshot: Snapshot) => void }) {
+export function GameCanvas({ engine, sound, onSnapshot }: {
+  engine: GameEngine; sound: SoundEngine; onSnapshot: (snapshot: Snapshot) => void;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
@@ -19,6 +22,8 @@ export function GameCanvas({ engine, onSnapshot }: { engine: GameEngine; onSnaps
     const context = canvas?.getContext('2d');
     if (!context) { setError(true); return; }
     const renderer = new Renderer(context);
+    const playSound = (cue: Parameters<SoundEngine['play']>[0]) => sound.play(cue);
+    engine.onSound = playSound;
     let lastSnapshotAt = -Infinity;
     let persistedScore = engine.highScore;
     const loop = new GameLoop(() => engine.update(), () => {
@@ -43,8 +48,9 @@ export function GameCanvas({ engine, onSnapshot }: { engine: GameEngine; onSnaps
     return () => {
       loop.stop(); detach();
       document.removeEventListener('visibilitychange', visibilityChange);
+      if (engine.onSound === playSound) engine.onSound = null;
     };
-  }, [engine, onSnapshot]);
+  }, [engine, sound, onSnapshot]);
 
   useEffect(() => {
     const viewport = viewportRef.current;

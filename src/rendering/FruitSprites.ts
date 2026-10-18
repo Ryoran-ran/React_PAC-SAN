@@ -1,4 +1,3 @@
-import { MAZE_OFFSET_Y } from '../config/constants';
 import type { FruitKind } from '../config/levelTables';
 
 interface FruitSprite {
@@ -86,7 +85,7 @@ const FRUIT_SPRITES: Record<FruitKind, FruitSprite> = {
 export function drawFruit(context: CanvasRenderingContext2D, kind: FruitKind, x: number, y: number): void {
   const sprite = FRUIT_SPRITES[kind];
   const left = Math.round(x) - 7;
-  const top = Math.round(y + MAZE_OFFSET_Y) - 7;
+  const top = Math.round(y) - 7;
   context.save();
   for (let row = 0; row < sprite.pixels.length; row++) {
     const pixels = sprite.pixels[row];

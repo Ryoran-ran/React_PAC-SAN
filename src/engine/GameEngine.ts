@@ -1,10 +1,11 @@
 import {
-  DYING_FRAMES, EXTRA_LIFE_SCORE, GHOST_EAT_FREEZE_FRAMES, GHOST_SCORE_POPUP_FRAMES,
+  DYING_FRAMES, EXTRA_LIFE_SCORE, FRUIT_SCORE_POPUP_FRAMES,
+  GHOST_EAT_FREEZE_FRAMES, GHOST_SCORE_POPUP_FRAMES,
   INITIAL_LIVES, LEVEL_CLEAR_FRAMES,
   NORMAL_DOT_FREEZE_FRAMES, POWER_DOT_FREEZE_FRAMES, READY_FRAMES,
   TILE_SIZE, TOTAL_DOTS, type Direction,
 } from '../config/constants';
-import { GHOST_HOUSE_LIMITS, getLevelConfig } from '../config/levelTables';
+import { GHOST_HOUSE_LIMITS, getLevelConfig, type FruitKind } from '../config/levelTables';
 import { PacSan } from '../entities/PacSan';
 import { createGhosts, type Ghost } from '../entities/Ghost';
 import { GhostHouse } from '../ai/GhostHouse';
@@ -19,10 +20,16 @@ import { isAtTileCenter } from './CollisionSystem';
 import type { GameState } from './GameState';
 import { DEFAULT_DEBUG_DISPLAY, type DebugDisplayKey, type DebugDisplayOptions } from './DebugDisplay';
 import { GameRandom } from './Random';
+import type { SoundCue } from './SoundCue';
 
 export interface GhostScorePopup {
   readonly x: number;
   readonly y: number;
+  readonly points: number;
+  framesRemaining: number;
+}
+
+export interface FruitScorePopup {
   readonly points: number;
   framesRemaining: number;
 }
@@ -35,6 +42,9 @@ export class GameEngine {
   modeScheduler = new ModeScheduler();
   ghostHouse = new GhostHouse();
   fruit = new FruitSystem();
+  collectedFruits: FruitKind[] = [];
+  fruitPickupCount = 0;
+  fruitScorePopup: FruitScorePopup | null = null;
   random = new GameRandom();
   score = 0;
   highScore: number;
@@ -53,6 +63,7 @@ export class GameEngine {
   debugDisplay: DebugDisplayOptions = { ...DEFAULT_DEBUG_DISPLAY };
   autoPlayLevel: AutoPlayLevel | null = null;
   autoPlayTarget: { x: number; y: number } | null = null;
+  onSound: ((cue: SoundCue) => void) | null = null;
   private autoDecisionCenter: string | null = null;
   private pausedFrom: 'READY' | 'PLAYING' = 'PLAYING';
 
@@ -67,9 +78,12 @@ export class GameEngine {
     this.lives = INITIAL_LIVES;
     this.extraLifeAwarded = false;
     this.score = 0;
+    this.collectedFruits = [];
+    this.fruitPickupCount = 0;
     this.frame = 0;
     this.playFrame = 0;
     this.beginRound(true, false);
+    this.onSound?.('start');
   }
 
   private beginRound(newMaze: boolean, afterDeath: boolean): void {
@@ -88,6 +102,7 @@ export class GameEngine {
     this.ghostCombo = 0;
     this.ghostEatFreezeFrames = 0;
     this.ghostScorePopups = [];
+    this.fruitScorePopup = null;
     this.autoPlayTarget = null;
     this.autoDecisionCenter = null;
     this.state = 'READY';
@@ -149,6 +164,9 @@ export class GameEngine {
       return;
     }
     this.ghostScorePopups = this.ghostScorePopups.filter((popup) => --popup.framesRemaining > 0);
+    if (this.fruitScorePopup && --this.fruitScorePopup.framesRemaining <= 0) {
+      this.fruitScorePopup = null;
+    }
     if (this.ghostEatFreezeFrames > 0) {
       this.ghostEatFreezeFrames--;
       return;
@@ -174,7 +192,13 @@ export class GameEngine {
       if (isAtTileCenter(this.player)) {
         const center = `${this.player.x},${this.player.y}`;
         if (center !== this.autoDecisionCenter) {
-          const decision = chooseAutoDirection(this.player, this.ghosts, this.maze, this.autoPlayLevel);
+          const decision = chooseAutoDirection(this.player, this.ghosts, this.maze, this.autoPlayLevel, {
+            round: this.level,
+            frightenedFramesRemaining: this.frightenedFramesRemaining,
+            fruit: this.fruit,
+            elroyStage: this.elroyStage,
+            committedTarget: this.autoPlayLevel === 'tas' ? this.autoPlayTarget : null,
+          });
           if (decision) {
             this.player.requestedDirection = decision.direction;
             this.autoPlayTarget = decision.target;
@@ -202,6 +226,7 @@ export class GameEngine {
           this.fruit.hide();
           completedLevel = true;
         }
+        this.onSound?.(completedLevel ? 'levelClear' : dot === 'power' ? 'power' : 'dot');
         return true;
       }
       return false;
@@ -216,7 +241,15 @@ export class GameEngine {
     consumeAtCenter();
     if (completedLevel) return;
 
-    this.addScore(this.fruit.collectAt(this.player.x, this.player.y));
+    const fruitPoints = this.fruit.collectAt(this.player.x, this.player.y);
+    if (fruitPoints > 0) {
+      this.addScore(fruitPoints);
+      this.fruitPickupCount++;
+      this.collectedFruits.unshift(this.fruit.kind);
+      this.collectedFruits.length = Math.min(this.collectedFruits.length, 7);
+      this.fruitScorePopup = { points: fruitPoints, framesRemaining: FRUIT_SCORE_POPUP_FRAMES };
+      this.onSound?.('fruit');
+    }
     if (this.resolveGhostContacts()) return;
     const blinky = this.ghosts.find((ghost) => ghost.id === 'blinky')!;
     for (const ghost of this.ghosts) {
@@ -276,6 +309,7 @@ export class GameEngine {
         ghost.requestReverse();
         const points = 200 * 2 ** Math.min(this.ghostCombo, 3);
         this.addScore(points);
+        this.onSound?.('ghost');
         this.ghostScorePopups.push({
           x: ghost.x, y: ghost.y, points,
           framesRemaining: GHOST_SCORE_POPUP_FRAMES,
@@ -285,10 +319,12 @@ export class GameEngine {
       } else {
         this.ghostEatFreezeFrames = 0;
         this.ghostScorePopups = [];
+        this.fruitScorePopup = null;
         this.lives--;
         this.state = 'PLAYER_DYING';
         this.stateFramesRemaining = DYING_FRAMES;
         this.fruit.hide();
+        this.onSound?.('death');
         this.autoPlayTarget = null;
         return true;
       }
@@ -303,6 +339,7 @@ export class GameEngine {
     if (!this.extraLifeAwarded && this.score >= EXTRA_LIFE_SCORE) {
       this.lives++;
       this.extraLifeAwarded = true;
+      this.onSound?.('extraLife');
     }
   }
 
@@ -318,6 +355,9 @@ export class GameEngine {
       fruit: { kind: this.fruit.kind, points: this.fruit.points,
         visible: this.fruit.visible, framesRemaining: this.fruit.framesRemaining,
         spawnedCount: this.fruit.spawnedCount },
+      collectedFruits: [...this.collectedFruits],
+      fruitPickupCount: this.fruitPickupCount,
+      fruitScorePopup: this.fruitScorePopup ? { ...this.fruitScorePopup } : null,
       level: this.level, frame: this.frame, playFrame: this.playFrame,
       remainingDots: this.maze.remainingDots,
       collectedDots: TOTAL_DOTS - this.maze.remainingDots,

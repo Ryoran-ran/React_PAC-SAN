@@ -1,8 +1,8 @@
 import {
-  COLORS, GHOST_EAT_FREEZE_FRAMES, GHOST_SCORE_POPUP_FRAMES, MAZE_COLUMNS,
+  COLORS, FRUIT_SCORE_POPUP_FRAMES, GHOST_EAT_FREEZE_FRAMES, GHOST_SCORE_POPUP_FRAMES, MAZE_COLUMNS,
   MAZE_OFFSET_Y, MAZE_ROWS, SCREEN_HEIGHT, SCREEN_WIDTH, TILE_CENTER, TILE_SIZE,
 } from '../config/constants';
-import { getLevelConfig } from '../config/levelTables';
+import { getFruitCounter, getLevelConfig } from '../config/levelTables';
 import type { GameEngine } from '../engine/GameEngine';
 import { canPlayerEnter } from '../map/tileRules';
 import { visibleDebugTarget } from './DebugTarget';
@@ -41,7 +41,9 @@ export class Renderer {
       } else ctx.fillRect(x - 1, y - 1, 2, 2);
     }
     ctx.restore();
-    if (engine.fruit.visible) drawFruit(ctx, engine.fruit.kind, FRUIT_POSITION.x, FRUIT_POSITION.y);
+    if (engine.fruit.visible) {
+      drawFruit(ctx, engine.fruit.kind, FRUIT_POSITION.x, FRUIT_POSITION.y + MAZE_OFFSET_Y);
+    }
     const config = getLevelConfig(engine.level);
     const flash = engine.frightenedFramesRemaining > 0
       && engine.frightenedFramesRemaining <= config.frightenedFlashes * 24
@@ -57,7 +59,11 @@ export class Renderer {
       ctx.arc(12 + life * 15, 283, 5, 0.25 * Math.PI, 1.75 * Math.PI);
       ctx.closePath(); ctx.fill();
     }
-    pixelText(ctx, `ROUND ${String(engine.level).padStart(2, '0')}`, SCREEN_WIDTH - 8, 278, COLORS.text, 'right');
+    const stageFruits = getFruitCounter(engine.level);
+    for (let index = 0; index < stageFruits.length; index++) {
+      drawFruit(ctx, stageFruits[index],
+        SCREEN_WIDTH - 12 - (stageFruits.length - index - 1) * 16, SCREEN_HEIGHT - 7);
+    }
 
     const message = {
       TITLE: 'PUSH ENTER', READY: 'READY', PLAYING: '', PAUSED: 'PAUSED',
@@ -70,6 +76,24 @@ export class Renderer {
     }
     if (engine.debug) this.drawDebug(engine, flash);
     this.drawGhostScorePopups(engine);
+    if (engine.state === 'PLAYING') this.drawFruitScorePopup(engine);
+  }
+
+  private drawFruitScorePopup(engine: GameEngine): void {
+    const popup = engine.fruitScorePopup;
+    if (!popup) return;
+    const ctx = this.context;
+    const label = `+${popup.points}`;
+    const elapsed = FRUIT_SCORE_POPUP_FRAMES - popup.framesRemaining;
+    const x = FRUIT_POSITION.x;
+    const y = FRUIT_POSITION.y + MAZE_OFFSET_Y - 4 - Math.floor(elapsed / 12);
+    const width = label.length * 6 - 1;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, popup.framesRemaining / 15);
+    ctx.fillStyle = COLORS.background;
+    ctx.fillRect(Math.round(x - width / 2) - 2, y - 1, width + 4, 9);
+    pixelText(ctx, label, x, y, '#ffb8ff', 'center');
+    ctx.restore();
   }
 
   private drawGhostScorePopups(engine: GameEngine): void {

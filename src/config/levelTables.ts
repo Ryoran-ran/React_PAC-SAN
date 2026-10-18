@@ -57,6 +57,14 @@ const FRUITS: readonly [FruitKind, number][] = [
   ['apple', 700], ['apple', 700], ['melon', 1000], ['melon', 1000],
   ['galaxian', 2000], ['galaxian', 2000], ['bell', 3000], ['bell', 3000],
 ];
+
+/** Current round at the left, up to six earlier rounds toward the right. */
+export function getFruitCounter(level: number): FruitKind[] {
+  const round = Math.max(1, Math.floor(level));
+  return Array.from({ length: Math.min(round, 7) }, (_, index) =>
+    FRUITS[round - index - 1]?.[0] ?? 'key');
+}
+
 const FRIGHT_SECONDS = [6, 5, 4, 3, 2, 5, 2, 2, 1, 5, 2, 1, 1, 3, 1, 1, 0, 1] as const;
 
 export function getLevelConfig(level: number): LevelConfig {

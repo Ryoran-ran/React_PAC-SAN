@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
-  DYING_FRAMES, EXTRA_LIFE_SCORE, GHOST_EAT_FREEZE_FRAMES, GHOST_SCORE_POPUP_FRAMES,
+  DYING_FRAMES, EXTRA_LIFE_SCORE, FRUIT_SCORE_POPUP_FRAMES,
+  GHOST_EAT_FREEZE_FRAMES, GHOST_SCORE_POPUP_FRAMES,
   LEVEL_CLEAR_FRAMES, READY_FRAMES, TILE_CENTER, TILE_SIZE,
 } from '../config/constants';
-import { getLevelConfig } from '../config/levelTables';
+import { getFruitCounter, getLevelConfig } from '../config/levelTables';
 import { GameEngine } from '../engine/GameEngine';
 import { GameRandom } from '../engine/Random';
 import { tileIndex } from '../map/maze';
-import { FruitSystem } from '../systems/FruitSystem';
+import { FRUIT_POSITION, FruitSystem } from '../systems/FruitSystem';
 
 const at = (tile: number) => tile * TILE_SIZE + TILE_CENTER;
 
@@ -203,6 +204,7 @@ describe('Phase 3 game systems', () => {
 
   it('spawns and collects the first fruit at 70 dots, then uses the next level fruit', () => {
     const engine = playing();
+    expect(getFruitCounter(engine.level)).toEqual(['cherry']);
     engine.ghosts = [];
     engine.maze.dots.clear();
     for (let index = 0; index < 174; index++) engine.maze.dots.set(1000 + index, 'normal');
@@ -216,8 +218,103 @@ describe('Phase 3 game systems', () => {
     engine.update();
     expect(engine.fruit.visible).toBe(false);
     expect(engine.score).toBe(110);
+    expect(getFruitCounter(engine.level)).toEqual(['cherry']);
     expect(getLevelConfig(2).fruit).toBe('strawberry');
     expect(getLevelConfig(2).fruitPoints).toBe(300);
+  });
+
+  it('shows the current round rather than the number of fruits eaten', () => {
+    const engine = playing();
+    engine.ghosts = [];
+    expect(getFruitCounter(engine.level)).toEqual(['cherry']);
+    expect(engine.collectedFruits).toEqual([]);
+    expect(engine.fruitPickupCount).toBe(0);
+
+    engine.fruit.framesRemaining = 10;
+    engine.player.x = FRUIT_POSITION.x;
+    engine.player.y = FRUIT_POSITION.y;
+    engine.player.freezeFrames = 1;
+    engine.update();
+    expect(engine.score).toBe(100);
+    expect(getFruitCounter(engine.level)).toEqual(['cherry']);
+    expect(engine.collectedFruits).toEqual(['cherry']);
+    expect(engine.fruitPickupCount).toBe(1);
+    expect(engine.fruitScorePopup).toEqual({ points: 100, framesRemaining: FRUIT_SCORE_POPUP_FRAMES });
+
+    engine.fruit.reset(1);
+    engine.fruit.framesRemaining = 10;
+    engine.player.freezeFrames = 1;
+    engine.update();
+    expect(engine.score).toBe(200);
+    expect(getFruitCounter(engine.level)).toEqual(['cherry']);
+    expect(engine.collectedFruits).toEqual(['cherry', 'cherry']);
+    expect(engine.fruitPickupCount).toBe(2);
+
+    engine.level = 2;
+    expect(getFruitCounter(engine.level)).toEqual(['strawberry', 'cherry']);
+    engine.fruit.reset(2);
+    engine.fruit.framesRemaining = 10;
+    engine.player.freezeFrames = 1;
+    engine.update();
+    expect(engine.score).toBe(500);
+    expect(engine.collectedFruits).toEqual(['strawberry', 'cherry', 'cherry']);
+    expect(engine.fruitScorePopup?.points).toBe(300);
+
+    engine.state = 'GAME_OVER';
+    engine.start();
+    expect(getFruitCounter(engine.level)).toEqual(['cherry']);
+    expect(engine.collectedFruits).toEqual([]);
+    expect(engine.fruitPickupCount).toBe(0);
+    expect(engine.fruitScorePopup).toBeNull();
+  });
+
+  it('holds fruit score feedback during pause, then expires without pausing play', () => {
+    const engine = playing();
+    engine.ghosts = [];
+    engine.fruit.framesRemaining = 10;
+    engine.player.x = FRUIT_POSITION.x;
+    engine.player.y = FRUIT_POSITION.y;
+    engine.player.freezeFrames = 1;
+    engine.update();
+    expect(engine.state).toBe('PLAYING');
+    engine.pause();
+    for (let frame = 0; frame < FRUIT_SCORE_POPUP_FRAMES; frame++) engine.update();
+    expect(engine.fruitScorePopup?.framesRemaining).toBe(FRUIT_SCORE_POPUP_FRAMES);
+    engine.togglePause();
+    engine.player.freezeFrames = FRUIT_SCORE_POPUP_FRAMES + 1;
+    for (let frame = 0; frame < FRUIT_SCORE_POPUP_FRAMES; frame++) engine.update();
+    expect(engine.fruitScorePopup).toBeNull();
+    expect(engine.state).toBe('PLAYING');
+  });
+
+  it('keeps the latest seven acquired fruits while counting every pickup', () => {
+    const engine = playing();
+    engine.ghosts = [];
+    engine.player.x = FRUIT_POSITION.x;
+    engine.player.y = FRUIT_POSITION.y;
+    for (let pickup = 0; pickup < 8; pickup++) {
+      engine.fruit.reset(1);
+      engine.fruit.framesRemaining = 10;
+      engine.player.freezeFrames = 1;
+      engine.update();
+    }
+    expect(engine.score).toBe(800);
+    expect(engine.fruitPickupCount).toBe(8);
+    expect(engine.collectedFruits).toEqual(Array(7).fill('cherry'));
+    expect(getFruitCounter(engine.level)).toEqual(['cherry']);
+  });
+
+  it('shows at most seven recent round symbols, newest on the left', () => {
+    expect(getFruitCounter(7)).toEqual([
+      'melon', 'apple', 'apple', 'peach', 'peach', 'strawberry', 'cherry',
+    ]);
+    expect(getFruitCounter(8)).toEqual([
+      'melon', 'melon', 'apple', 'apple', 'peach', 'peach', 'strawberry',
+    ]);
+    expect(getFruitCounter(13)).toEqual([
+      'key', 'bell', 'bell', 'galaxian', 'galaxian', 'melon', 'melon',
+    ]);
+    expect(getFruitCounter(19)).toEqual(Array(7).fill('key'));
   });
 
   it('offers the second fruit at 170 dots and removes it after its timed window', () => {
@@ -250,6 +347,7 @@ describe('Phase 3 game systems', () => {
     for (let frame = 0; frame < LEVEL_CLEAR_FRAMES; frame++) engine.update();
     expect(engine.state).toBe('READY');
     expect(engine.level).toBe(2);
+    expect(getFruitCounter(engine.level)).toEqual(['strawberry', 'cherry']);
     expect(engine.maze.remainingDots).toBe(244);
     expect(engine.score).toBe(10);
     expect(engine.fruit.kind).toBe('strawberry');

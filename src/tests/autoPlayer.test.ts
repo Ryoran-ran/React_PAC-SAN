@@ -20,10 +20,25 @@ describe('debug auto-play', () => {
     const ghost = createGhosts()[0];
     ghost.x = at(3);
     ghost.y = at(5);
-    ghost.direction = 'left';
+    ghost.direction = 'right';
 
     expect(chooseAutoDirection(player, [ghost], maze, 'beginner')?.direction).toBe('left');
     expect(chooseAutoDirection(player, [ghost], maze, 'tas')?.direction).toBe('right');
+  });
+
+  it('keeps the chosen dot as its route goal when the maze is sparse and safe', () => {
+    const player = new PacSan();
+    player.x = at(6);
+    player.y = at(5);
+    const maze = new Maze();
+    maze.dots.clear();
+    maze.dots.set(tileIndex(5, 5), 'normal');
+    maze.dots.set(tileIndex(8, 5), 'normal');
+
+    const decision = chooseAutoDirection(player, [], maze, 'tas', {
+      round: 1, frightenedFramesRemaining: 0, committedTarget: { x: 8, y: 5 },
+    });
+    expect(decision).toEqual({ direction: 'right', target: { x: 8, y: 5 } });
   });
 
   it.each(['beginner', 'standard', 'expert', 'tas'] as AutoPlayLevel[])(
@@ -51,6 +66,23 @@ describe('debug auto-play', () => {
     expect(a.snapshot()).toEqual(b.snapshot());
     expect([...a.maze.dots]).toEqual([...b.maze.dots]);
   });
+
+  it('TAS clears four rounds without exhausting its lives on the fixed seed', () => {
+    const engine = new GameEngine();
+    engine.toggleDebug();
+    engine.setAutoPlayLevel('tas');
+    engine.start();
+    let deaths = 0;
+    let previousLives = engine.lives;
+    for (let frame = 0; frame < 20000 && engine.level < 5
+      && engine.state !== 'GAME_OVER'; frame++) {
+      engine.update();
+      if (engine.lives < previousLives) deaths += previousLives - engine.lives;
+      previousLives = engine.lives;
+    }
+    expect(engine.level).toBeGreaterThanOrEqual(5);
+    expect(deaths).toBeLessThanOrEqual(3);
+  }, 30000);
 
   it.each(['beginner', 'standard', 'expert', 'tas'] as AutoPlayLevel[])(
     '%s can finish a full round autonomously', (level) => {
