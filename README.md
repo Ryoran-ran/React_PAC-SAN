@@ -1,5 +1,7 @@
 # PAC-SAN（パックサン）
 
+[ブラウザでPAC-SANを遊ぶ](https://ryoran-ran.github.io/React_PAC-SAN/)
+
 1980年アーケード版のゲームシステム再現を目指す、React / TypeScript / Vite / Canvas 2D製の迷路アクションです。**現在はPhase 3（ゲーム進行）まで実装**しています。
 
 ## 起動
