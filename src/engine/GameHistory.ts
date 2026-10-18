@@ -7,7 +7,7 @@ const MAX_HISTORY_EVENTS = MAX_HISTORY_FRAMES * 2;
 const TRIM_HISTORY_EVENTS = FIXED_FPS * 10;
 
 export type HistoryEventKind =
-  | 'game_start' | 'round_start' | 'round_clear' | 'game_over'
+  | 'game_start' | 'round_start' | 'round_clear' | 'game_over' | 'return_to_title'
   | 'manual_input' | 'auto_play_changed' | 'auto_decision' | 'pause' | 'resume'
   | 'dot_collected' | 'fruit_spawned' | 'fruit_collected'
   | 'ghost_decision' | 'ghost_eaten' | 'life_lost' | 'extra_life';
@@ -27,6 +27,7 @@ function captureFrame(engine: GameEngine, sequence: number) {
     frame: engine.frame,
     playFrame: engine.playFrame,
     level: engine.level,
+    gameMode: engine.gameMode,
     state: engine.state,
     score: engine.score,
     lives: engine.lives,

@@ -59,6 +59,31 @@ describe('Phase 3 game systems', () => {
     expect(engine.player.freezeFrames).toBe(1);
   });
 
+  it.each([
+    { offset: -1, kind: 'normal' as const, points: 10, freeze: 1 },
+    { offset: 1, kind: 'power' as const, points: 50, freeze: 3 },
+  ])('collects a $kind cookie when a one-pixel turn finishes at the junction',
+    ({ offset, kind, points, freeze }) => {
+      const engine = playing();
+      engine.ghosts = [];
+      engine.maze.dots.clear();
+      engine.maze.dots.set(tileIndex(6, 1), kind);
+      engine.maze.dots.set(tileIndex(6, 2), 'normal');
+      engine.player.x = at(6) + offset;
+      engine.player.y = at(1);
+      engine.player.direction = 'right';
+      engine.player.requestedDirection = 'down';
+
+      engine.update();
+
+      expect(engine.player.x).toBe(at(6));
+      expect(engine.player.y).toBe(at(1) + 1);
+      expect(engine.player.turning).toBeNull();
+      expect(engine.maze.remainingDots).toBe(1);
+      expect(engine.score).toBe(points);
+      expect(engine.player.freezeFrames).toBe(freeze);
+    });
+
   it('activates a power dot crossed midway through a two-pixel update', () => {
     const engine = playing();
     engine.level = 5;

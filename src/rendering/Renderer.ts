@@ -67,7 +67,7 @@ export class Renderer {
       if (!clearing) for (const ghost of engine.ghosts) drawGhost(ctx, ghost, flash);
       if (engine.ghostEatFreezeFrames === 0) drawPlayer(ctx, engine.player);
     } else drawDyingPlayer(ctx, engine.player, engine.stateFramesRemaining);
-    for (let life = 0; life < Math.min(engine.lives - 1, 6); life++) {
+    for (let life = 0; engine.gameMode === 'arcade' && life < Math.min(engine.lives - 1, 6); life++) {
       drawLifeIcon(ctx, 12 + life * 15, SCREEN_HEIGHT - 7);
     }
     const stageFruits = getFruitCounter(engine.level);

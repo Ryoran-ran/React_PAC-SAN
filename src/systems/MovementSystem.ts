@@ -13,7 +13,7 @@ export function speedSteps(frame: number, percent: number): number {
 }
 
 export function movePlayer(player: PacSan, speedPercent = getLevelConfig(1).playerSpeedPercent,
-  onDotCheck?: () => boolean): boolean {
+  onDotCheck?: (turnedThisStep: boolean) => boolean): boolean {
   player.moving = false;
   if (player.freezeFrames > 0) {
     player.freezeFrames--;
@@ -40,6 +40,7 @@ export function movePlayer(player: PacSan, speedPercent = getLevelConfig(1).play
       if (!canMoveFromCenter(player, player.direction)) break;
     }
     const vector = DIRECTIONS[player.direction];
+    const turnedThisStep = player.turning !== null;
     if (player.turning) {
       const { centerX, centerY, from } = player.turning;
       const oldAxis = DIRECTIONS[from].x !== 0 ? 'x' : 'y';
@@ -60,7 +61,7 @@ export function movePlayer(player: PacSan, speedPercent = getLevelConfig(1).play
     player.moving = true;
     // A faster level can cross a center on the first of two pixel steps.
     // A diagonal turn also needs a check before it bypasses that center.
-    if ((player.turning || isAtTileCenter(player)) && onDotCheck?.()) break;
+    if ((turnedThisStep || isAtTileCenter(player)) && onDotCheck?.(turnedThisStep)) break;
   }
   return player.moving;
 }
