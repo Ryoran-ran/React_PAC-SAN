@@ -24,8 +24,16 @@ export default function App() {
   });
   const [sound] = useState(() => new SoundEngine(soundEnabled));
   const [snapshot, setSnapshot] = useState(() => engine.snapshot());
+  const [mobileInfoOpen, setMobileInfoOpen] = useState(false);
   const canPause = ['READY', 'PLAYING', 'PAUSED'].includes(snapshot.state);
   const canStart = snapshot.state === 'TITLE' || snapshot.state === 'GAME_OVER';
+  const mobileAction = () => {
+    if (canStart) {
+      engine.start();
+      setMobileInfoOpen(false);
+    } else if (canPause) engine.togglePause();
+    setSnapshot(engine.snapshot());
+  };
   const move = (direction: Direction) => {
     engine.requestDirection(direction);
     setSnapshot(engine.snapshot());
@@ -82,7 +90,21 @@ export default function App() {
         <div className="arcade-bottom"><span>224 × 288 <span className="muted">PX</span></span><span>60 <span className="muted">HZ</span></span><span className="muted">CANVAS 2D</span></div>
       </section>
 
-      <aside className="side-panel">
+      <aside className={`side-panel${mobileInfoOpen ? ' mobile-info-open' : ''}`}>
+        <div className="mobile-panel-bar">
+          <button className={`mobile-game-action ${canStart ? 'primary-button' : 'secondary-button'}`}
+            onClick={mobileAction} disabled={!canStart && !canPause}>
+            {canStart ? snapshot.state === 'GAME_OVER' ? 'もう一度プレイ' : 'ゲームをはじめる'
+              : snapshot.state === 'PAUSED' ? '▶ 再開する' : canPause ? 'Ⅱ 一時停止' : 'プレイ進行中'}
+          </button>
+          <button className="mobile-panel-toggle" aria-expanded={mobileInfoOpen}
+            aria-controls="mobile-info-panel" onClick={() => setMobileInfoOpen(!mobileInfoOpen)}>
+            {mobileInfoOpen ? '情報を閉じる' : '情報を見る'}
+          </button>
+        </div>
+        {mobileInfoOpen && <button className="mobile-panel-backdrop" aria-label="情報を閉じる"
+          onClick={() => setMobileInfoOpen(false)} />}
+        <div className="side-panel-content" id="mobile-info-panel">
         <section className="run-stats" aria-label="プレイ状況">
           <div className="stat-heading"><span>DOTS COLLECTED</span><span>ROUND {String(snapshot.level).padStart(2, '0')}</span></div>
           <div className="dot-count"><strong>{String(snapshot.collectedDots).padStart(3, '0')}</strong><span>/ {TOTAL_DOTS}</span></div>
@@ -104,7 +126,7 @@ export default function App() {
             <button className="left" aria-label="左へ移動" onClick={() => move('left')}>←</button>
             <button className="down" aria-label="下へ移動" onClick={() => move('down')}>↓</button>
             <button className="right" aria-label="右へ移動" onClick={() => move('right')}>→</button>
-          </div><p>矢印キー / WASD<span>曲がる方向は先に入力できます</span></p></div>
+          </div><p>スワイプ / 矢印キー・WASD<span>曲がる方向は先に入力できます</span></p></div>
           <div className="debug-control"><span>設定</span><div className="quick-toggles">
             <button onClick={toggleSound} aria-label={`サウンドを${soundEnabled ? 'オフ' : 'オン'}にする`} aria-pressed={soundEnabled}><kbd>♪</kbd><span>{soundEnabled ? 'ON' : 'OFF'}</span></button>
             <button onClick={toggleDebug} aria-label={`デバッグ表示を${snapshot.debug ? 'オフ' : 'オン'}にする`} aria-pressed={snapshot.debug}><kbd>F3</kbd><span>{snapshot.debug ? 'ON' : 'OFF'}</span></button>
@@ -116,6 +138,7 @@ export default function App() {
           onHistoryRecordingChange={changeHistoryRecording}
           onHistoryExport={exportHistory}
           onClose={toggleDebug} />}
+        </div>
       </aside>
     </main>
     <footer className="site-footer"><span>PAC-SAN <span className="muted">/ パックサン</span></span><span>1980 ARCADE RECREATION <span className="footer-divider">·</span> v0.3.1</span></footer>

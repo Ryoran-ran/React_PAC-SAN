@@ -22,10 +22,12 @@ button:focus-visible, a:focus-visible { outline: 2px solid #ffdf00; outline-offs
 .live-state i { width: 5px; height: 5px; border-radius: 50%; background: #656671; }
 .live-state i.active { background: #a3d583; }
 .screen-bezel { position: relative; min-height: 0; min-width: 0; display: flex; background: #000; border: 1px solid #25252e; border-radius: 5px; padding: 6px; }
-.canvas-viewport { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; min-width: 0; min-height: 0; }
+.canvas-viewport { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; min-width: 0; min-height: 0; touch-action: none; user-select: none; }
 canvas { display: block; image-rendering: pixelated; flex-shrink: 0; }
 .arcade-bottom { padding: 10px 2px 0; font-size: 9px; line-height: 11px; letter-spacing: .5px; }
 .side-panel { min-width: 0; min-height: 0; display: flex; flex-direction: column; justify-content: flex-start; gap: clamp(12px, 2vh, 20px); }
+.side-panel-content { display: contents; }
+.mobile-panel-bar, .mobile-panel-backdrop { display: none; }
 .run-stats { border-top: 1px solid #2a2b33; border-bottom: 1px solid #2a2b33; padding: 14px 0 12px; }
 .stat-heading { display: flex; justify-content: space-between; gap: 6px; font: 9px/1.3 Consolas, monospace; letter-spacing: .8px; color: #92939e; }
 .stat-heading span:last-child { color: #777883; white-space: nowrap; }
@@ -143,7 +145,7 @@ h2 { font: 10px/1.3 Consolas, monospace; letter-spacing: 1.5px; font-weight: 400
   .movement-controls p { font-size: 10px; }
 }
 
-/* Portrait phones: maze above a compact, always-visible control dock. */
+/* Portrait phones: keep a small action dock and reveal details over the maze. */
 @media (max-width: 680px) and (min-height: 561px), (max-width: 519px) {
   .app-shell { padding-inline: 12px; grid-template-rows: 46px minmax(0, 1fr); }
   .wordmark { font-size: 21px; gap: 8px; }
@@ -156,7 +158,14 @@ h2 { font: 10px/1.3 Consolas, monospace; letter-spacing: 1.5px; font-weight: 400
   .arcade-bottom { padding-top: 7px; font-size: 8px; }
   .screen-bezel { padding: 4px; }
   .debug-display-menu { top: 7px; left: 7px; max-height: calc(100% - 14px); }
-  .side-panel { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: 'stats actions' 'controls controls' 'note note'; gap: 8px 16px; }
+  .side-panel { position: relative; display: block; }
+  .mobile-panel-bar { position: relative; z-index: 7; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+  .mobile-panel-bar button { min-height: 42px; }
+  .mobile-panel-toggle { border: 1px solid #50515b; border-radius: 5px; background: #1b1c24; color: #efefea; font-size: 11px; font-weight: 600; }
+  .mobile-panel-toggle:hover { background: #292a34; }
+  .mobile-panel-backdrop { position: fixed; z-index: 5; inset: 0; display: block; width: 100%; border: 0; background: #000a; }
+  .side-panel-content { display: none; }
+  .mobile-info-open .side-panel-content { position: fixed; z-index: 6; left: 12px; right: 12px; bottom: calc(60px + env(safe-area-inset-bottom)); display: grid; grid-template-columns: minmax(0, 1fr); grid-template-areas: 'stats' 'controls' 'note' 'debug'; gap: 14px; max-height: calc(100dvh - 124px - env(safe-area-inset-bottom)); overflow-y: auto; overscroll-behavior: contain; padding: 15px; border: 1px solid #50515b; border-radius: 8px; background: #101116; box-shadow: 0 16px 48px #000c; }
   .run-stats { grid-area: stats; border: 0; padding: 2px 0; align-self: center; }
   .stat-heading { font-size: 8px; letter-spacing: .3px; }
   .stat-heading span:last-child { display: none; }
@@ -168,7 +177,7 @@ h2 { font: 10px/1.3 Consolas, monospace; letter-spacing: 1.5px; font-weight: 400
   .run-details strong { font-size: 8px; }
   .fruit-pickups { margin-top: 4px; font-size: 8px; }
   .fruit-pickups strong { font-size: 8px; }
-  .actions { grid-area: actions; gap: 5px; }
+  .actions { display: none; }
   .primary-button, .secondary-button { min-height: 32px; padding: 7px 10px; font-size: 11px; justify-content: center; }
   .actions kbd { display: none; }
   .controls { grid-area: controls; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -186,7 +195,7 @@ h2 { font: 10px/1.3 Consolas, monospace; letter-spacing: 1.5px; font-weight: 400
   .phase-note p { margin: 0; font-size: 9px; line-height: 1.4; }
   .phase-note br { display: none; }
   .site-footer { display: none; }
-  .debug-panel { position: fixed; z-index: 2; right: 12px; bottom: 8px; width: min(360px, calc(100vw - 24px)); max-height: calc(100dvh - 60px); background: #101a1bf8; box-shadow: 0 12px 40px #0009; }
+  .debug-panel { position: static; grid-area: debug; width: 100%; max-height: none; overflow: visible; background: #101a1b; box-shadow: none; }
 }
 
 /* Landscape phones and low desktop windows use a compact horizontal layout. */

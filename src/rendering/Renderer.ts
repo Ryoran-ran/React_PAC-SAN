@@ -22,6 +22,9 @@ export class Renderer {
 
   draw(engine: GameEngine): void {
     const ctx = this.context;
+    ctx.setTransform(ctx.canvas.width / SCREEN_WIDTH, 0, 0,
+      ctx.canvas.height / SCREEN_HEIGHT, 0, 0);
+    ctx.imageSmoothingEnabled = false;
     ctx.fillStyle = COLORS.background;
     ctx.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
     pixelText(ctx, '1UP', 8, 1, COLORS.text);
@@ -31,15 +34,24 @@ export class Renderer {
     ctx.save();
     ctx.translate(0, MAZE_OFFSET_Y);
     this.maze.draw(ctx);
+    // Draw every cookie in backing-store pixels. Fractional CSS scaling would
+    // otherwise turn identical 2×2 cookies into different visible sizes.
+    const cookieTransform = ctx.getTransform();
+    const cookieScale = Math.min(cookieTransform.a, cookieTransform.d);
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     for (const [index, dot] of engine.maze.dots) {
       const x = (index % MAZE_COLUMNS) * TILE_SIZE + TILE_CENTER;
       const y = Math.floor(index / MAZE_COLUMNS) * TILE_SIZE + TILE_CENTER;
+      const displayX = x * cookieTransform.a + cookieTransform.e;
+      const displayY = y * cookieTransform.d + cookieTransform.f;
       if (dot === 'power') {
         if (engine.state !== 'PLAYING' || Math.floor(engine.playFrame / 10) % 2 === 0) {
-          drawCookie(ctx, x, y, true);
+          drawCookie(ctx, displayX, displayY, true, cookieScale);
         }
-      } else drawCookie(ctx, x, y, false);
+      } else drawCookie(ctx, displayX, displayY, false, cookieScale);
     }
+    ctx.restore();
     ctx.restore();
     if (engine.fruit.visible) {
       drawFruit(ctx, engine.fruit.kind, FRUIT_POSITION.x, FRUIT_POSITION.y + MAZE_OFFSET_Y);

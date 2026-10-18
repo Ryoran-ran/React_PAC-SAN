@@ -4,6 +4,7 @@ import { SCREEN_HEIGHT, SCREEN_WIDTH } from '../config/constants';
 import type { GameEngine } from '../engine/GameEngine';
 import { GameLoop } from '../engine/GameLoop';
 import { attachKeyboard } from '../input/KeyboardController';
+import { attachSwipe } from '../input/SwipeController';
 import { Renderer } from '../rendering/Renderer';
 import { saveHighScore } from '../storage/highScore';
 
@@ -14,13 +15,14 @@ export function GameCanvas({ engine, sound, onSnapshot }: {
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(1);
+  const [display, setDisplay] = useState({ scale: 1, pixelRatio: 1 });
   const [error, setError] = useState(false);
 
   useEffect(() => {
     const canvas = canvasRef.current;
+    const viewport = viewportRef.current;
     const context = canvas?.getContext('2d');
-    if (!context) { setError(true); return; }
+    if (!canvas || !viewport || !context) { setError(true); return; }
     const renderer = new Renderer(context);
     const playSound = (cue: Parameters<SoundEngine['play']>[0]) => sound.play(cue);
     engine.onSound = playSound;
@@ -39,6 +41,10 @@ export function GameCanvas({ engine, sound, onSnapshot }: {
       }
     });
     const detach = attachKeyboard(engine, window);
+    const detachSwipe = attachSwipe(viewport, (direction) => {
+      engine.requestDirection(direction);
+      onSnapshot(engine.snapshot());
+    });
     const visibilityChange = () => {
       if (document.hidden) { engine.pause(); loop.stop(); onSnapshot(engine.snapshot()); }
       else loop.start();
@@ -47,6 +53,7 @@ export function GameCanvas({ engine, sound, onSnapshot }: {
     loop.start();
     return () => {
       loop.stop(); detach();
+      detachSwipe();
       document.removeEventListener('visibilitychange', visibilityChange);
       if (engine.onSound === playSound) engine.onSound = null;
     };
@@ -57,20 +64,28 @@ export function GameCanvas({ engine, sound, onSnapshot }: {
     if (!viewport) return;
     const resize = () => {
       const fit = Math.min(viewport.clientWidth / SCREEN_WIDTH, viewport.clientHeight / SCREEN_HEIGHT);
-      // Prefer integer scaling; shrink the complete screen when even 1× cannot fit.
-      if (fit > 0) setScale(fit >= 1 ? Math.floor(fit) : fit);
+      // Fill compact viewports; use exact pixel multiples when at least 2× fits.
+      if (fit > 0) {
+        const scale = fit >= 2 ? Math.floor(fit) : fit;
+        const pixelRatio = window.devicePixelRatio || 1;
+        setDisplay(current => current.scale === scale && current.pixelRatio === pixelRatio
+          ? current : { scale, pixelRatio });
+      }
     };
     const observer = new ResizeObserver(resize);
     observer.observe(viewport);
+    window.addEventListener('resize', resize);
     resize();
-    return () => observer.disconnect();
+    return () => { observer.disconnect(); window.removeEventListener('resize', resize); };
   }, []);
 
   return <div className="canvas-viewport" ref={viewportRef}>
     {error ? <p role="alert">Canvas 2Dを利用できません。対応ブラウザーで開いてください。</p> :
-      <canvas ref={canvasRef} width={SCREEN_WIDTH} height={SCREEN_HEIGHT}
-        style={{ width: SCREEN_WIDTH * scale, height: SCREEN_HEIGHT * scale }}
-        aria-label="PAC-SANの迷路。Enterで開始し、矢印キーまたはWASDで移動します。"
+      <canvas ref={canvasRef}
+        width={Math.round(SCREEN_WIDTH * display.scale * display.pixelRatio)}
+        height={Math.round(SCREEN_HEIGHT * display.scale * display.pixelRatio)}
+        style={{ width: SCREEN_WIDTH * display.scale, height: SCREEN_HEIGHT * display.scale }}
+        aria-label="PAC-SANの迷路。Enterで開始し、画面のスワイプ、矢印キーまたはWASDで移動します。"
         role="img" />}
   </div>;
 }

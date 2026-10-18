@@ -61,6 +61,21 @@ describe('pixel-art field', () => {
     expect(pixels[3]).toEqual({ x: 8, y: 11, width: 8, height: 1 });
   });
 
+  it('keeps every cookie the same pixel size at a fractional display scale', () => {
+    const { context, pixels } = recordingContext();
+    drawCookie(context, 20.2, 20.2, false, 1.33);
+    drawCookie(context, 39.9, 39.9, false, 1.33);
+    expect(pixels.map(({ width, height }) => [width, height])).toEqual([[3, 3], [3, 3]]);
+    pixels.length = 0;
+    drawCookie(context, 20.2, 20.2, true, 1.33);
+    const firstShape = pixels.map(({ x, y, width, height }) =>
+      [x - pixels[0].x, y - pixels[0].y, width, height]);
+    pixels.length = 0;
+    drawCookie(context, 39.9, 39.9, true, 1.33);
+    expect(pixels.map(({ x, y, width, height }) =>
+      [x - pixels[0].x, y - pixels[0].y, width, height])).toEqual(firstShape);
+  });
+
   it('keeps the resting Pac-Man mouth open with a solid stepped silhouette', () => {
     const { context, pixels } = recordingContext();
     drawLifeIcon(context, 20, 20);
