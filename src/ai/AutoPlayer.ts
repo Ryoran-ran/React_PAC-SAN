@@ -3,6 +3,7 @@ import {
   POWER_DOT_FREEZE_FRAMES, TILE_SIZE, TUNNEL_ROW, type Direction,
 } from '../config/constants';
 import { GHOST_HOUSE_LIMITS, getLevelConfig } from '../config/levelTables';
+import { chooseNightmareDirection, planNightmareTargets } from './NightmareAI';
 import type { Ghost, TilePoint } from '../entities/Ghost';
 import type { PacSan } from '../entities/PacSan';
 import { tileIndex, type Maze } from '../map/maze';
@@ -120,6 +121,7 @@ export interface AutoPlayDecision {
 
 export interface TasContext {
   readonly round: number;
+  readonly nightmarePursuit?: boolean;
   readonly frightenedFramesRemaining: number;
   readonly fruit?: { readonly visible: boolean; readonly framesRemaining: number; readonly points: number };
   readonly elroyStage?: 0 | 1 | 2;
@@ -168,13 +170,14 @@ function advanceLeavingGhost(ghost: Ghost, speed: number): void {
 }
 
 function ghostForecast(player: PacSan, ghosts: readonly Ghost[], context: TasContext,
-  frames: number): ForecastGhost[][] {
+  frames: number, plannedDirection: Direction = player.direction): ForecastGhost[][] {
   const config = getLevelConfig(context.round);
   const copies = ghosts.map((ghost) => Object.assign(Object.create(Object.getPrototypeOf(ghost)) as Ghost, ghost));
   // From round five, Elroy can keep gaining on a player in a long corridor.
   const fastElroy = context.round >= 5 && context.elroyStage === 2;
   const projectedPlayer = { ...player };
-  projectedPlayer.requestedDirection = player.direction;
+  projectedPlayer.requestedDirection = plannedDirection;
+  let projectedPlayerTile = tileOf(projectedPlayer);
   const playerSpeed = context.frightenedFramesRemaining > 0
     ? config.frightenedPlayerSpeedPercent : config.playerSpeedPercent;
   const result: ForecastGhost[][] = [];
@@ -185,7 +188,21 @@ function ghostForecast(player: PacSan, ghosts: readonly Ghost[], context: TasCon
         && (ghost.state === 'NORMAL' || frame >= context.frightenedFramesRemaining),
     })));
     if (frame === frames) break;
-    if (fastElroy) movePlayer(projectedPlayer, playerSpeed);
+    if (fastElroy || context.nightmarePursuit) {
+      movePlayer(projectedPlayer, playerSpeed);
+      const nextPlayerTile = tileOf(projectedPlayer);
+      if (context.nightmarePursuit
+        && (nextPlayerTile.x !== projectedPlayerTile.x
+          || nextPlayerTile.y !== projectedPlayerTile.y)) {
+        const targets = planNightmareTargets(projectedPlayer, copies);
+        for (const ghost of copies) {
+          if (ghost.houseState === 'OUTSIDE' && ghost.state === 'NORMAL') {
+            ghost.targetTile = targets.get(ghost.id) ?? ghost.targetTile;
+          }
+        }
+      }
+      projectedPlayerTile = nextPlayerTile;
+    }
     for (const ghost of copies) {
       if (ghost.houseState === 'LEAVING_HOME') {
         advanceLeavingGhost(ghost, config.ghostSpeedPercent);
@@ -204,9 +221,10 @@ function ghostForecast(player: PacSan, ghosts: readonly Ghost[], context: TasCon
         : inTunnel ? config.ghostTunnelSpeedPercent
           : ghost.id === 'blinky' && context.elroyStage
             ? config.elroySpeedPercent[context.elroyStage - 1] : config.ghostSpeedPercent;
-      // Keep other ghosts' visible targets for this short horizon. Once
-      // Blinky is much faster, project his pursuit of the moving player.
-      moveGhost(ghost, speed);
+      // Arcade keeps visible targets over this short horizon. Nightmare
+      // refreshes its interceptors when the projected player changes tiles.
+      moveGhost(ghost, speed, undefined,
+        context.nightmarePursuit ? chooseNightmareDirection : undefined);
     }
   }
   return result;
@@ -315,7 +333,7 @@ function chooseTasDirection(player: PacSan, ghosts: readonly Ghost[], maze: Maze
     .sort((a, b) => huntTargetDistances![a] - huntTargetDistances![b])[0] : null;
   // Follow a whole-maze dot route during a safe frightened window or when
   // only scattered dots remain. The short beam can flip its distant goal.
-  if (!fruitGoal && !huntGoal
+  if (!context.nightmarePursuit && !fruitGoal && !huntGoal
     && (maze.remainingDots <= 12 || context.frightenedFramesRemaining > 30)
     && ghosts.every((ghost) =>
       ghost.houseState !== 'OUTSIDE' || ghost.state === 'EATEN'
@@ -325,8 +343,14 @@ function chooseTasDirection(player: PacSan, ghosts: readonly Ghost[], maze: Maze
     if (route) return route;
   }
   // MovementSystem advances at speed / 80 pixels per frame on average.
-  const forecast = ghostForecast(player, ghosts, context,
-    player.freezeFrames + TAS_HORIZON_TILES * (moveFrames + 3) + 1);
+  const forecastFrames = player.freezeFrames + TAS_HORIZON_TILES * (moveFrames + 3) + 1;
+  const firstNeighbors = neighbors(start);
+  const nightmareForecasts = context.nightmarePursuit
+    ? new Map(firstNeighbors.map(({ direction }) =>
+      [direction, ghostForecast(player, ghosts, context, forecastFrames, direction)] as const))
+    : null;
+  const forecast = nightmareForecasts ? null
+    : ghostForecast(player, ghosts, context, forecastFrames);
   const staticThreat = threatCosts(ghosts, POLICIES.tas);
   const dotDistances = nearestDotDistances(maze);
   const committedIndex = context.committedTarget
@@ -346,7 +370,7 @@ function chooseTasDirection(player: PacSan, ghosts: readonly Ghost[], maze: Maze
         && distances[tileIndex(tileOf(ghost).x, tileOf(ghost).y)] <= usefulRadius).length);
     }
   }
-  let routes: TasRoute[] = neighbors(start).map((neighbor) => ({
+  let routes: TasRoute[] = firstNeighbors.map((neighbor) => ({
     index: start, time: player.freezeFrames, score: 0,
     firstDirection: neighbor.direction, target: start,
     visited: new Set<number>([start]),
@@ -380,7 +404,7 @@ function chooseTasDirection(player: PacSan, ghosts: readonly Ghost[], maze: Maze
         if (depth === 0 && neighbor.direction !== route.firstDirection) continue;
         const time = route.time + moveFrames;
         const risk = projectedRisk(route.index, neighbor.index, route.time, moveFrames,
-          forecast, route.poweredUntil);
+          nightmareForecasts?.get(route.firstDirection) ?? forecast!, route.poweredUntil);
         if (!Number.isFinite(risk)) continue;
         const dot = maze.dots.get(neighbor.index);
         const freshDot = dot && !route.visited.has(neighbor.index);

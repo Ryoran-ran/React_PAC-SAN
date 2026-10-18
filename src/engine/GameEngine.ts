@@ -279,6 +279,7 @@ export class GameEngine {
         if (center !== this.autoDecisionCenter) {
           const decision = chooseAutoDirection(this.player, this.ghosts, this.maze, this.autoPlayLevel, {
             round: this.level,
+            nightmarePursuit: this.ghostAI === 'nightmare' && this.ghostBehavior !== 'scatter',
             frightenedFramesRemaining: this.frightenedFramesRemaining,
             fruit: this.fruit,
             elroyStage: this.elroyStage,
