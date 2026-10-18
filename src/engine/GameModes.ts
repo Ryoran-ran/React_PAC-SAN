@@ -4,6 +4,7 @@ export type GameMode = 'arcade' | 'freeplay' | 'nightmare';
 export type GhostAI = 'arcade' | 'nightmare';
 export type GhostBehavior = 'standard' | 'chase' | 'scatter';
 export type GhostTargeting = Readonly<Record<GhostId, GhostId>>;
+export type UpwardTargeting = 'corrected' | 'original';
 
 const GHOST_IDS: readonly GhostId[] = ['blinky', 'pinky', 'inky', 'clyde'];
 const isGhostId = (value: unknown): value is GhostId => GHOST_IDS.includes(value as GhostId);
@@ -14,10 +15,11 @@ export interface FreePlaySettings {
   ghostAI: GhostAI;
   ghostBehavior: GhostBehavior;
   ghostTargeting: GhostTargeting;
+  upwardTargeting: UpwardTargeting;
 }
 
 export type FreePlaySettingsInput = Pick<FreePlaySettings, 'startLevel' | 'ghostCount'>
-  & Partial<Pick<FreePlaySettings, 'ghostAI' | 'ghostBehavior'>>
+  & Partial<Pick<FreePlaySettings, 'ghostAI' | 'ghostBehavior' | 'upwardTargeting'>>
   & { ghostTargeting?: Partial<GhostTargeting> };
 
 export const DEFAULT_FREE_PLAY_SETTINGS: Readonly<FreePlaySettings> = {
@@ -26,6 +28,7 @@ export const DEFAULT_FREE_PLAY_SETTINGS: Readonly<FreePlaySettings> = {
   ghostAI: 'arcade',
   ghostBehavior: 'standard',
   ghostTargeting: { blinky: 'blinky', pinky: 'pinky', inky: 'inky', clyde: 'clyde' },
+  upwardTargeting: 'corrected',
 };
 
 export function normalizeFreePlaySettings(settings: FreePlaySettingsInput): FreePlaySettings {
@@ -38,6 +41,7 @@ export function normalizeFreePlaySettings(settings: FreePlaySettingsInput): Free
     ghostAI: settings.ghostAI === 'nightmare' ? 'nightmare' : 'arcade',
     ghostBehavior: settings.ghostBehavior === 'chase' || settings.ghostBehavior === 'scatter'
       ? settings.ghostBehavior : 'standard',
+    upwardTargeting: settings.upwardTargeting === 'original' ? 'original' : 'corrected',
     ghostTargeting: Object.fromEntries(GHOST_IDS.map((id) => {
       const style = settings.ghostTargeting?.[id];
       return [id, isGhostId(style) ? style : id];

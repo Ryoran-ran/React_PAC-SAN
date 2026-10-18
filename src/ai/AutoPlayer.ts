@@ -2,12 +2,12 @@ import {
   DIRECTIONS, MAZE_COLUMNS, MAZE_ROWS, NORMAL_DOT_FREEZE_FRAMES, OPPOSITE,
   POWER_DOT_FREEZE_FRAMES, TILE_SIZE, TUNNEL_ROW, type Direction,
 } from '../config/constants';
-import { getLevelConfig } from '../config/levelTables';
+import { GHOST_HOUSE_LIMITS, getLevelConfig } from '../config/levelTables';
 import type { Ghost, TilePoint } from '../entities/Ghost';
 import type { PacSan } from '../entities/PacSan';
 import { tileIndex, type Maze } from '../map/maze';
 import { canPlayerEnter } from '../map/tileRules';
-import { moveGhost, movePlayer } from '../systems/MovementSystem';
+import { ghostStepCount, moveGhost, movePlayer } from '../systems/MovementSystem';
 import { FRUIT_POSITION } from '../systems/FruitSystem';
 
 export type AutoPlayLevel = 'beginner' | 'standard' | 'expert' | 'tas';
@@ -146,6 +146,27 @@ interface TasRoute {
 const TAS_HORIZON_TILES = 9;
 const TAS_BEAM_WIDTH = 14;
 
+function advanceLeavingGhost(ghost: Ghost, speed: number): void {
+  // Mirror GhostHouse's exit path so a ghost about to emerge is forecast as a threat.
+  const steps = ghostStepCount(ghost, speed);
+  for (let step = 0; step < steps; step++) {
+    if (ghost.x !== GHOST_HOUSE_LIMITS.exitX) {
+      ghost.direction = ghost.x < GHOST_HOUSE_LIMITS.exitX ? 'right' : 'left';
+      ghost.x += ghost.direction === 'right' ? 1 : -1;
+    } else {
+      ghost.direction = 'up';
+      ghost.y--;
+    }
+    if (ghost.y <= GHOST_HOUSE_LIMITS.exitY) {
+      ghost.y = GHOST_HOUSE_LIMITS.exitY;
+      ghost.direction = 'left';
+      ghost.houseState = 'OUTSIDE';
+      ghost.lastDecision = null;
+      break;
+    }
+  }
+}
+
 function ghostForecast(player: PacSan, ghosts: readonly Ghost[], context: TasContext,
   frames: number): ForecastGhost[][] {
   const config = getLevelConfig(context.round);
@@ -166,6 +187,10 @@ function ghostForecast(player: PacSan, ghosts: readonly Ghost[], context: TasCon
     if (frame === frames) break;
     if (fastElroy) movePlayer(projectedPlayer, playerSpeed);
     for (const ghost of copies) {
+      if (ghost.houseState === 'LEAVING_HOME') {
+        advanceLeavingGhost(ghost, config.ghostSpeedPercent);
+        continue;
+      }
       if (ghost.houseState !== 'OUTSIDE' || ghost.state === 'EATEN') continue;
       if (fastElroy && ghost.id === 'blinky') {
         ghost.targetTile = tileOf(projectedPlayer);
@@ -254,13 +279,27 @@ function chooseTasDirection(player: PacSan, ghosts: readonly Ghost[], maze: Maze
   const fruitIndex = tileIndex(Math.floor(FRUIT_POSITION.x / TILE_SIZE),
     Math.floor(FRUIT_POSITION.y / TILE_SIZE));
   const fruitDistances = context.fruit?.visible ? graphDistances(fruitIndex) : null;
-  // A detour only pays when the fruit can be reached before both timers run out.
-  const fruitGoal = !!fruitDistances && Number.isFinite(fruitDistances[start])
-    && fruitDistances[start] <= 12
-    && (fruitDistances[start] + 2) * moveFrames + player.freezeFrames
+  const fruitDistance = fruitDistances?.[start] ?? Number.POSITIVE_INFINITY;
+  const distancesFromPlayer = fruitDistances && fruitDistance <= 12
+    ? graphDistances(start) : null;
+  const fruitSafeWithoutPower = !!fruitDistances && !!distancesFromPlayer
+    && ghosts.every((ghost) => {
+      if ((ghost.houseState !== 'OUTSIDE' && ghost.houseState !== 'LEAVING_HOME')
+        || ghost.state !== 'NORMAL') return true;
+      const ghostTile = ghost.houseState === 'LEAVING_HOME'
+        ? { x: Math.floor(GHOST_HOUSE_LIMITS.exitX / TILE_SIZE),
+          y: Math.floor(GHOST_HOUSE_LIMITS.exitY / TILE_SIZE) } : tileOf(ghost);
+      const ghostIndex = tileIndex(ghostTile.x, ghostTile.y);
+      return distancesFromPlayer[ghostIndex] > 4
+        && fruitDistances[ghostIndex] > fruitDistance + 3;
+    });
+  // Pursue fruit only while it remains reachable and the trip is powered or uncontested.
+  const fruitGoal = !!fruitDistances && Number.isFinite(fruitDistance)
+    && fruitDistance <= 12
+    && (fruitDistance + 2) * moveFrames + player.freezeFrames
       < context.fruit!.framesRemaining
-    && (fruitDistances[start] + 2) * moveFrames + player.freezeFrames + 20
-      < context.frightenedFramesRemaining;
+    && ((fruitDistance + 2) * moveFrames + player.freezeFrames + 20
+      < context.frightenedFramesRemaining || fruitSafeWithoutPower);
   const edibleGhosts = ghosts.filter((ghost) => ghost.houseState === 'OUTSIDE'
     && ghost.state === 'FRIGHTENED');
   const huntDistances = context.frightenedFramesRemaining > moveFrames * 3
@@ -373,7 +412,8 @@ function chooseTasDirection(player: PacSan, ghosts: readonly Ghost[], maze: Maze
         const fruitReward = fruit ? Math.min(100, 10 + context.fruit!.points / 10) : 0;
         const fruitProgress = fruitGoal && !route.fruitCollected
           && time < context.fruit!.framesRemaining
-          ? (fruitDistances![route.index] - fruitDistances![neighbor.index]) * 2 : 0;
+          ? (fruitDistances![route.index] - fruitDistances![neighbor.index])
+            * (context.fruit!.points >= 300 ? 5 : 3) : 0;
         const huntProgress = huntGoal && time < route.poweredUntil - moveFrames * 2
           ? (huntDistances![route.index] - huntDistances![neighbor.index]) * 3 : 0;
         expanded.push({

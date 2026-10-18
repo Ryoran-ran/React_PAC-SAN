@@ -169,7 +169,7 @@ export default function App() {
 
     <main className="game-layout">
       <section className="arcade" aria-label="ゲーム画面" inert={showStartScreen}>
-        <div className="arcade-top"><span>{String(snapshot.level).padStart(2, '0')} <span className="muted">/ {snapshot.gameMode === 'freeplay' ? snapshot.ghostAI === 'nightmare' ? 'FREE PLAY · NIGHTMARE' : 'FREE PLAY' : snapshot.gameMode === 'nightmare' ? 'NIGHTMARE' : 'MAZE ACTION'}</span></span><span className="live-state"><i className={snapshot.state === 'PLAYING' ? 'active' : ''} />{STATE_LABELS[snapshot.state]}</span></div>
+        <div className="arcade-top"><span>{String(snapshot.level).padStart(2, '0')} <span className="muted">/ {snapshot.gameMode === 'freeplay' ? snapshot.ghostAI === 'nightmare' ? 'FREE PLAY · NIGHTMARE' : 'FREE PLAY' : snapshot.gameMode === 'nightmare' ? 'NIGHTMARE' : 'ARCADE'}</span></span><span className="live-state"><i className={snapshot.state === 'PLAYING' ? 'active' : ''} />{STATE_LABELS[snapshot.state]}</span></div>
         <div className="screen-bezel">
           <GameCanvas engine={engine} sound={sound} speed={gameSpeed} onSnapshot={setSnapshot}
             onStart={startGame} onMenuModeChange={changeStartMode} />

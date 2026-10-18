@@ -16,6 +16,15 @@ describe('Phase 2 ghost target calculations', () => {
     expect(getPinkyTarget({ x: 14, y: 23 }, 'up')).toEqual({ x: 14, y: 19 });
   });
 
+  it('can reproduce Pinky and Inky original upward offsets only when selected', () => {
+    const player = { x: 14, y: 23 };
+    const blinky = { x: 10, y: 10 };
+    expect(getPinkyTarget(player, 'up', 'original')).toEqual({ x: 10, y: 19 });
+    expect(getInkyTarget(player, 'up', blinky, 'original')).toEqual({ x: 14, y: 32 });
+    expect(getPinkyTarget(player, 'left', 'original')).toEqual({ x: 10, y: 23 });
+    expect(getInkyTarget(player, 'right', blinky, 'original')).toEqual({ x: 22, y: 36 });
+  });
+
   it('doubles Inky\'s vector from Blinky through the two-ahead pivot', () => {
     expect(getInkyTarget({ x: 14, y: 23 }, 'right', { x: 10, y: 10 }))
       .toEqual({ x: 22, y: 36 });

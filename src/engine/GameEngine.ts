@@ -109,6 +109,8 @@ export class GameEngine {
       mode: this.gameMode, startLevel: this.level, ghostCount: this.ghosts.length,
       ghostAI: this.ghostAI, ghostBehavior: this.ghostBehavior,
       ghostTargeting: JSON.stringify(this.freePlaySettings.ghostTargeting),
+      upwardTargeting: this.gameMode === 'freeplay'
+        ? this.freePlaySettings.upwardTargeting : 'corrected',
     });
     this.history.recordEvent(this, 'round_start', { reason: 'new_game' });
     this.history.recordFrame(this);
@@ -376,7 +378,8 @@ export class GameEngine {
         : ghost.state === 'NORMAL' && nightmareTargets
           ? nightmareTargets.get(ghost.id) ?? getGhostTarget(ghost, this.player, blinky)
           : getGhostTarget(ghost, this.player, blinky, ghost.id === 'blinky'
-            && this.elroyStage > 0 && this.ghostBehavior !== 'scatter', chaseStyle);
+            && this.elroyStage > 0 && this.ghostBehavior !== 'scatter', chaseStyle,
+          this.gameMode === 'freeplay' ? this.freePlaySettings.upwardTargeting : 'corrected');
     }
     for (const ghost of this.ghosts) {
       if (ghost.houseState !== 'OUTSIDE') continue;

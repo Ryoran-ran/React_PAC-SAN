@@ -119,6 +119,26 @@ describe('game modes', () => {
     expect(pinky.scatterTarget).toEqual({ x: 2, y: -3 });
   });
 
+  it('applies the selected upward offset to normal Free Play pursuit', () => {
+    const engine = new GameEngine();
+    engine.configureStart('freeplay', {
+      startLevel: 1, ghostCount: 2, ghostBehavior: 'chase', upwardTargeting: 'original',
+    });
+    engine.setHistoryRecording(true);
+    engine.start();
+    expect(engine.history.exportData().events.find((event) => event.kind === 'game_start')?.detail
+      .upwardTargeting).toBe('original');
+    for (let frame = 0; frame < READY_FRAMES; frame++) engine.update();
+    engine.player.direction = 'up';
+    engine.player.requestedDirection = 'up';
+    engine.ghosts[1].houseState = 'OUTSIDE';
+    engine.update();
+    expect(engine.ghosts[1].targetTile).toEqual({
+      x: Math.floor(engine.player.x / TILE_SIZE) - 4,
+      y: Math.floor(engine.player.y / TILE_SIZE) - 4,
+    });
+  });
+
   it('retries Free Play indefinitely without erasing the round, dots or score', () => {
     const engine = new GameEngine(5000);
     engine.configureStart('freeplay', { startLevel: 5, ghostCount: 1 });
@@ -202,5 +222,7 @@ describe('game modes', () => {
     expect(normalizeFreePlaySettings({ startLevel: 1, ghostCount: 4,
       ghostTargeting: { pinky: 'blinky' } }).ghostTargeting)
       .toEqual({ ...DEFAULT_FREE_PLAY_SETTINGS.ghostTargeting, pinky: 'blinky' });
+    expect(normalizeFreePlaySettings({ startLevel: 1, ghostCount: 4,
+      upwardTargeting: 'original' }).upwardTargeting).toBe('original');
   });
 });

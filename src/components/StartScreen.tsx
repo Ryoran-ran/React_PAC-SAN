@@ -76,6 +76,14 @@ export function StartScreen({ view, selectedMode, settings, onModeActivate,
               if (event.key === 'Enter') event.stopPropagation();
             }}>ゴースト別の追跡方法</summary>
             <p>通常AIの追跡中に適用します。</p>
+            <label className="upward-target-setting">上向きの目標位置
+              <select value={settings.upwardTargeting}
+                onChange={(event) => onSettingsChange({ ...settings,
+                  upwardTargeting: event.target.value === 'original' ? 'original' : 'corrected' })}>
+                <option value="corrected">ずれを修正</option>
+                <option value="original">原作のずれを再現</option>
+              </select>
+            </label>
             <div className="ghost-target-grid">
               {GHOST_NAMES.map(({ id, name }) => <label key={id}>{name}
                 <select value={settings.ghostTargeting[id]}
