@@ -6,10 +6,11 @@ import { getFruitCounter, getLevelConfig } from '../config/levelTables';
 import type { GameEngine } from '../engine/GameEngine';
 import { canPlayerEnter } from '../map/tileRules';
 import { visibleDebugTarget } from './DebugTarget';
+import { drawCookie } from './CookieRenderer';
 import { drawFruit } from './FruitSprites';
 import { MazeRenderer } from './MazeRenderer';
 import { pixelText } from './PixelText';
-import { drawDyingPlayer, drawGhost, drawPlayer } from './SpriteRenderer';
+import { drawDyingPlayer, drawGhost, drawLifeIcon, drawPlayer, ghostVisualX } from './SpriteRenderer';
 import { FRUIT_POSITION } from '../systems/FruitSystem';
 
 export class Renderer {
@@ -33,12 +34,11 @@ export class Renderer {
     for (const [index, dot] of engine.maze.dots) {
       const x = (index % MAZE_COLUMNS) * TILE_SIZE + TILE_CENTER;
       const y = Math.floor(index / MAZE_COLUMNS) * TILE_SIZE + TILE_CENTER;
-      ctx.fillStyle = COLORS.dot;
       if (dot === 'power') {
         if (engine.state !== 'PLAYING' || Math.floor(engine.playFrame / 10) % 2 === 0) {
-          ctx.beginPath(); ctx.arc(x, y, 3.5, 0, Math.PI * 2); ctx.fill();
+          drawCookie(ctx, x, y, true);
         }
-      } else ctx.fillRect(x - 1, y - 1, 2, 2);
+      } else drawCookie(ctx, x, y, false);
     }
     ctx.restore();
     if (engine.fruit.visible) {
@@ -53,11 +53,7 @@ export class Renderer {
       if (engine.ghostEatFreezeFrames === 0) drawPlayer(ctx, engine.player);
     } else drawDyingPlayer(ctx, engine.player, engine.stateFramesRemaining);
     for (let life = 0; life < Math.min(engine.lives - 1, 6); life++) {
-      ctx.fillStyle = COLORS.player;
-      ctx.beginPath();
-      ctx.moveTo(12 + life * 15, 283);
-      ctx.arc(12 + life * 15, 283, 5, 0.25 * Math.PI, 1.75 * Math.PI);
-      ctx.closePath(); ctx.fill();
+      drawLifeIcon(ctx, 12 + life * 15, SCREEN_HEIGHT - 7);
     }
     const stageFruits = getFruitCounter(engine.level);
     for (let index = 0; index < stageFruits.length; index++) {
@@ -136,23 +132,24 @@ export class Renderer {
       ctx.strokeRect(x - 2, y + MAZE_OFFSET_Y - 2, 4, 4);
     }
     for (const ghost of engine.ghosts) {
+      const visualX = ghostVisualX(ghost);
       const frightened = ghost.state === 'FRIGHTENED';
       const debugColor = frightened ? flash ? '#dedeff' : '#2121ff' : ghost.color;
       if (display.ghostTargets) {
         const targetX = ghost.targetTile.x * TILE_SIZE + TILE_CENTER;
         const targetY = ghost.targetTile.y * TILE_SIZE + TILE_CENTER + MAZE_OFFSET_Y;
         const visibleTarget = visibleDebugTarget(
-          { x: ghost.x, y: ghost.y + MAZE_OFFSET_Y },
+          { x: visualX, y: ghost.y + MAZE_OFFSET_Y },
           { x: targetX, y: targetY },
         );
         ctx.strokeStyle = `${debugColor}88`;
-        const dx = visibleTarget.x - ghost.x;
+        const dx = visibleTarget.x - visualX;
         const dy = visibleTarget.y - (ghost.y + MAZE_OFFSET_Y);
         const distance = Math.hypot(dx, dy);
         const spriteEdge = frightened ? 8 : 0;
         if (distance > spriteEdge) {
           ctx.beginPath();
-          ctx.moveTo(ghost.x + dx / distance * spriteEdge,
+          ctx.moveTo(visualX + dx / distance * spriteEdge,
             ghost.y + MAZE_OFFSET_Y + dy / distance * spriteEdge);
           ctx.lineTo(visibleTarget.x, visibleTarget.y);
           ctx.stroke();
@@ -166,7 +163,7 @@ export class Renderer {
         for (const direction of ghost.lastDecision.candidates) {
           const vector = { up: [0, -1], left: [-1, 0], down: [0, 1], right: [1, 0] }[direction];
           ctx.fillRect(
-            ghost.x + vector[0] * markerDistance - 0.75,
+            visualX + vector[0] * markerDistance - 0.75,
             ghost.y + MAZE_OFFSET_Y + vector[1] * markerDistance - 0.75,
             1.5,
             1.5,

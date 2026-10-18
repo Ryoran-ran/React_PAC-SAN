@@ -34,6 +34,22 @@ export default function App() {
     engine.setAutoPlayLevel(level);
     setSnapshot(engine.snapshot());
   };
+  const changeHistoryRecording = (recording: boolean) => {
+    engine.setHistoryRecording(recording);
+    setSnapshot(engine.snapshot());
+  };
+  const exportHistory = () => {
+    if (engine.history.summary.frames === 0) return;
+    const json = JSON.stringify(engine.history.exportData());
+    const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `pac-san-history-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  };
   const toggleDebug = () => {
     engine.toggleDebug();
     setSnapshot(engine.snapshot());
@@ -97,6 +113,8 @@ export default function App() {
         <div className="phase-note"><span>DEVELOPMENT BUILD</span><p>Phase 3：恐怖・捕食、残機、フルーツ、面進行に対応。<br />細部の原作照合は今後進めます。</p></div>
         {snapshot.debug && <DebugPanel snapshot={snapshot}
           onAutoPlayChange={changeAutoPlay}
+          onHistoryRecordingChange={changeHistoryRecording}
+          onHistoryExport={exportHistory}
           onClose={toggleDebug} />}
       </aside>
     </main>

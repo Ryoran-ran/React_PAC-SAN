@@ -20,6 +20,7 @@ import { isAtTileCenter } from './CollisionSystem';
 import type { GameState } from './GameState';
 import { DEFAULT_DEBUG_DISPLAY, type DebugDisplayKey, type DebugDisplayOptions } from './DebugDisplay';
 import { GameRandom } from './Random';
+import { GameHistory } from './GameHistory';
 import type { SoundCue } from './SoundCue';
 
 export interface GhostScorePopup {
@@ -64,6 +65,7 @@ export class GameEngine {
   autoPlayLevel: AutoPlayLevel | null = null;
   autoPlayTarget: { x: number; y: number } | null = null;
   onSound: ((cue: SoundCue) => void) | null = null;
+  readonly history = new GameHistory();
   private autoDecisionCenter: string | null = null;
   private pausedFrom: 'READY' | 'PLAYING' = 'PLAYING';
 
@@ -83,6 +85,9 @@ export class GameEngine {
     this.frame = 0;
     this.playFrame = 0;
     this.beginRound(true, false);
+    this.history.recordEvent(this, 'game_start');
+    this.history.recordEvent(this, 'round_start', { reason: 'new_game' });
+    this.history.recordFrame(this);
     this.onSound?.('start');
   }
 
@@ -112,11 +117,15 @@ export class GameEngine {
     if (this.state === 'READY' || this.state === 'PLAYING' || this.state === 'PAUSED') {
       this.setAutoPlayLevel(null);
       this.player.requestedDirection = direction;
+      this.history.recordEvent(this, 'manual_input', { direction });
     }
   }
 
   setAutoPlayLevel(level: AutoPlayLevel | null): void {
     if (level && !this.debug) return;
+    if (this.autoPlayLevel !== level) {
+      this.history.recordEvent(this, 'auto_play_changed', { from: this.autoPlayLevel, to: level });
+    }
     this.autoPlayLevel = level;
     this.autoPlayTarget = null;
     this.autoDecisionCenter = null;
@@ -124,10 +133,14 @@ export class GameEngine {
   }
 
   togglePause(): void {
-    if (this.state === 'PAUSED') this.state = this.pausedFrom;
+    if (this.state === 'PAUSED') {
+      this.state = this.pausedFrom;
+      this.history.recordEvent(this, 'resume');
+    }
     else if (this.state === 'READY' || this.state === 'PLAYING') {
       this.pausedFrom = this.state;
       this.state = 'PAUSED';
+      this.history.recordEvent(this, 'pause');
     }
   }
 
@@ -144,17 +157,34 @@ export class GameEngine {
     this.debugDisplay[key] = visible;
   }
 
+  setHistoryRecording(recording: boolean): void {
+    if (recording) this.history.start(this);
+    else this.history.stop();
+  }
+
   update(): void {
+    const previousFrame = this.frame;
+    this.advanceFrame();
+    if (this.frame !== previousFrame) this.history.recordFrame(this);
+  }
+
+  private advanceFrame(): void {
     if (this.state === 'TITLE' || this.state === 'PAUSED' || this.state === 'GAME_OVER') return;
     this.frame++;
     if (this.state === 'PLAYER_DYING' || this.state === 'LEVEL_CLEAR') {
       if (--this.stateFramesRemaining <= 0) {
         if (this.state === 'PLAYER_DYING') {
-          if (this.lives > 0) this.beginRound(false, true);
-          else this.state = 'GAME_OVER';
+          if (this.lives > 0) {
+            this.beginRound(false, true);
+            this.history.recordEvent(this, 'round_start', { reason: 'respawn' });
+          } else {
+            this.state = 'GAME_OVER';
+            this.history.recordEvent(this, 'game_over', { score: this.score });
+          }
         } else {
           this.level++;
           this.beginRound(true, false);
+          this.history.recordEvent(this, 'round_start', { reason: 'next_round' });
         }
       }
       return;
@@ -203,6 +233,12 @@ export class GameEngine {
             this.player.requestedDirection = decision.direction;
             this.autoPlayTarget = decision.target;
           }
+          this.history.recordEvent(this, 'auto_decision', {
+            x: this.player.x, y: this.player.y,
+            direction: decision?.direction ?? null,
+            targetX: decision?.target.x ?? null,
+            targetY: decision?.target.y ?? null,
+          });
           this.autoDecisionCenter = center;
         }
       } else this.autoDecisionCenter = null;
@@ -216,15 +252,27 @@ export class GameEngine {
       const dot = this.maze.consumeAt(this.player.x, this.player.y);
       if (dot) {
         this.addScore(pointsForDot(dot));
+        this.history.recordEvent(this, 'dot_collected', {
+          x: this.player.x, y: this.player.y,
+          kind: dot, points: pointsForDot(dot), remainingDots: this.maze.remainingDots,
+        });
         this.ghostHouse.onDotConsumed();
         this.player.freezeFrames = dot === 'power' ? POWER_DOT_FREEZE_FRAMES : NORMAL_DOT_FREEZE_FRAMES;
+        const fruitWasVisible = this.fruit.visible;
         this.fruit.onDotCollected(this.maze.remainingDots, this.random);
+        if (!fruitWasVisible && this.fruit.visible) {
+          this.history.recordEvent(this, 'fruit_spawned', {
+            kind: this.fruit.kind, points: this.fruit.points,
+            framesRemaining: this.fruit.framesRemaining,
+          });
+        }
         if (dot === 'power') this.activateFrightened(config.frightenedFrames);
         if (this.maze.remainingDots === 0) {
           this.state = 'LEVEL_CLEAR';
           this.stateFramesRemaining = LEVEL_CLEAR_FRAMES;
           this.fruit.hide();
           completedLevel = true;
+          this.history.recordEvent(this, 'round_clear', { score: this.score });
         }
         this.onSound?.(completedLevel ? 'levelClear' : dot === 'power' ? 'power' : 'dot');
         return true;
@@ -248,6 +296,10 @@ export class GameEngine {
       this.collectedFruits.unshift(this.fruit.kind);
       this.collectedFruits.length = Math.min(this.collectedFruits.length, 7);
       this.fruitScorePopup = { points: fruitPoints, framesRemaining: FRUIT_SCORE_POPUP_FRAMES };
+      this.history.recordEvent(this, 'fruit_collected', {
+        kind: this.fruit.kind, points: fruitPoints,
+        x: this.player.x, y: this.player.y,
+      });
       this.onSound?.('fruit');
     }
     if (this.resolveGhostContacts()) return;
@@ -268,7 +320,19 @@ export class GameEngine {
           : inTunnel ? config.ghostTunnelSpeedPercent
             : ghost.id === 'blinky' && this.elroyStage > 0
               ? config.elroySpeedPercent[this.elroyStage - 1] : config.ghostSpeedPercent;
+      const previousDecision = ghost.lastDecision;
       moveGhost(ghost, speed, this.random);
+      if (ghost.lastDecision && ghost.lastDecision !== previousDecision) {
+        this.history.recordEvent(this, 'ghost_decision', {
+          ghost: ghost.id,
+          tileX: ghost.lastDecision.tile.x,
+          tileY: ghost.lastDecision.tile.y,
+          candidates: ghost.lastDecision.candidates.join(','),
+          chosen: ghost.lastDecision.chosen,
+          targetX: ghost.targetTile.x,
+          targetY: ghost.targetTile.y,
+        });
+      }
       if (ghost.state === 'EATEN' && ghost.x === GHOST_HOUSE_LIMITS.exitX
         && ghost.y === GHOST_HOUSE_LIMITS.exitY) {
         ghost.houseState = 'RETURNING_HOME';
@@ -309,6 +373,9 @@ export class GameEngine {
         ghost.requestReverse();
         const points = 200 * 2 ** Math.min(this.ghostCombo, 3);
         this.addScore(points);
+        this.history.recordEvent(this, 'ghost_eaten', {
+          ghost: ghost.id, points, x: ghost.x, y: ghost.y,
+        });
         this.onSound?.('ghost');
         this.ghostScorePopups.push({
           x: ghost.x, y: ghost.y, points,
@@ -322,6 +389,10 @@ export class GameEngine {
         this.fruitScorePopup = null;
         this.lives--;
         this.state = 'PLAYER_DYING';
+        this.history.recordEvent(this, 'life_lost', {
+          ghost: ghost.id, livesRemaining: this.lives,
+          x: this.player.x, y: this.player.y,
+        });
         this.stateFramesRemaining = DYING_FRAMES;
         this.fruit.hide();
         this.onSound?.('death');
@@ -339,6 +410,7 @@ export class GameEngine {
     if (!this.extraLifeAwarded && this.score >= EXTRA_LIFE_SCORE) {
       this.lives++;
       this.extraLifeAwarded = true;
+      this.history.recordEvent(this, 'extra_life', { lives: this.lives });
       this.onSound?.('extraLife');
     }
   }
@@ -397,6 +469,7 @@ export class GameEngine {
       })),
       debug: this.debug,
       debugDisplay: { ...this.debugDisplay },
+      history: this.history.summary,
     };
   }
 }

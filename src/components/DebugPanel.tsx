@@ -5,9 +5,11 @@ import type { AutoPlayLevel } from '../ai/AutoPlayer';
 
 const shortDirection = { up: 'U', left: 'L', down: 'D', right: 'R' } as const;
 
-export function DebugPanel({ snapshot, onAutoPlayChange, onClose }: {
+export function DebugPanel({ snapshot, onAutoPlayChange, onHistoryRecordingChange, onHistoryExport, onClose }: {
   snapshot: ReturnType<GameEngine['snapshot']>;
   onAutoPlayChange: (level: AutoPlayLevel | null) => void;
+  onHistoryRecordingChange: (recording: boolean) => void;
+  onHistoryExport: () => void;
   onClose: () => void;
 }) {
   const { player } = snapshot;
@@ -35,6 +37,19 @@ export function DebugPanel({ snapshot, onAutoPlayChange, onClose }: {
       </select>
       <span>{snapshot.autoPlayTarget ? `→ ${snapshot.autoPlayTarget.x},${snapshot.autoPlayTarget.y}` : '目標 —'}</span>
     </div>}
+    <div className="history-control" aria-label="ゲーム履歴">
+      <span title="直近10分のフレームを保持します。上限を超えると古い記録から破棄します。">
+        {snapshot.history.recording ? '● 記録中' : '履歴'} {snapshot.history.frames.toLocaleString()}F
+        {(snapshot.history.droppedFrames > 0 || snapshot.history.droppedEvents > 0)
+          && <small title="古い履歴は上限により破棄されました"> · 一部省略</small>}
+      </span>
+      <button type="button" onClick={() => onHistoryRecordingChange(!snapshot.history.recording)}>
+        {snapshot.history.recording ? '停止' : '記録開始'}
+      </button>
+      <button type="button" onClick={onHistoryExport} disabled={snapshot.history.frames === 0}>
+        JSON出力
+      </button>
+    </div>
     {snapshot.debugDisplay.engineStats && <dl className="debug-summary">
       <dt>状態 / 残機</dt><dd>{snapshot.state} / {snapshot.lives}</dd>
       <dt>ステージ / F</dt><dd>{snapshot.level} / {snapshot.frame}</dd>
