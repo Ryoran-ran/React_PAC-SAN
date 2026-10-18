@@ -2,11 +2,14 @@ import { FIXED_FPS } from '../config/constants';
 import { LEVEL_ONE } from '../config/levelTables';
 import type { GameEngine } from '../engine/GameEngine';
 import type { AutoPlayLevel } from '../ai/AutoPlayer';
+import { GAME_SPEEDS, type GameSpeed } from '../engine/GameLoop';
 
 const shortDirection = { up: 'U', left: 'L', down: 'D', right: 'R' } as const;
 
-export function DebugPanel({ snapshot, onAutoPlayChange, onHistoryRecordingChange, onHistoryExport, onClose }: {
+export function DebugPanel({ snapshot, gameSpeed, onGameSpeedChange, onAutoPlayChange, onHistoryRecordingChange, onHistoryExport, onClose }: {
   snapshot: ReturnType<GameEngine['snapshot']>;
+  gameSpeed: GameSpeed;
+  onGameSpeedChange: (speed: GameSpeed) => void;
   onAutoPlayChange: (level: AutoPlayLevel | null) => void;
   onHistoryRecordingChange: (recording: boolean) => void;
   onHistoryExport: () => void;
@@ -37,6 +40,13 @@ export function DebugPanel({ snapshot, onAutoPlayChange, onHistoryRecordingChang
       </select>
       <span>{snapshot.autoPlayTarget ? `→ ${snapshot.autoPlayTarget.x},${snapshot.autoPlayTarget.y}` : '目標 —'}</span>
     </div>}
+    <div className="game-speed-control">
+      <label htmlFor="game-speed">ゲーム速度</label>
+      <select id="game-speed" value={gameSpeed}
+        onChange={(event) => onGameSpeedChange(Number(event.target.value) as GameSpeed)}>
+        {GAME_SPEEDS.map(speed => <option key={speed} value={speed}>{speed}×</option>)}
+      </select>
+    </div>
     <div className="history-control" aria-label="ゲーム履歴">
       <span title="直近10分のフレームを保持します。上限を超えると古い記録から破棄します。">
         {snapshot.history.recording ? '● 記録中' : '履歴'} {snapshot.history.frames.toLocaleString()}F

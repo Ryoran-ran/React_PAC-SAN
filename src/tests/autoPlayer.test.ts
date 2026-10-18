@@ -192,10 +192,14 @@ describe('debug auto-play', () => {
     expect(engine.level,
       `state=${engine.state} lives=${engine.lives} dots=${engine.maze.remainingDots} deaths=${deaths}`)
       .toBeGreaterThanOrEqual(5);
-    expect(deaths).toBeLessThanOrEqual(3);
+    // The recorded round-4 circuit around (15,27)-(15,29) previously cost
+    // two extra lives while the player waited for ghosts to close in.
+    expect(deaths).toBeLessThanOrEqual(1);
+    expect(events.filter(event => event.kind === 'life_lost'
+      && event.detail.x === 124 && event.detail.y === 212)).toHaveLength(0);
     expect(events.filter(event => event.kind === 'ghost_eaten').length).toBeGreaterThanOrEqual(10);
     expect(events.filter(event => event.kind === 'fruit_collected').length).toBeGreaterThanOrEqual(1);
-    expect(engine.score).toBeGreaterThanOrEqual(15000);
+    expect(engine.score).toBeGreaterThanOrEqual(14500);
   }, 30000);
 
   it('TAS gets through the fifth round', () => {

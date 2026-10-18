@@ -1,5 +1,6 @@
 import type { AutoPlayLevel } from '../ai/AutoPlayer';
 import { DEFAULT_DEBUG_DISPLAY, type DebugDisplayOptions } from '../engine/DebugDisplay';
+import { GAME_SPEEDS, type GameSpeed } from '../engine/GameLoop';
 
 export const DEBUG_PREFERENCES_KEY = 'pac-san-debug-preferences-v1';
 
@@ -8,6 +9,7 @@ export interface DebugPreferences {
   debugDisplay: DebugDisplayOptions;
   autoPlayLevel: AutoPlayLevel | null;
   historyRecording: boolean;
+  gameSpeed: GameSpeed;
 }
 
 const displayKeys = Object.keys(DEFAULT_DEBUG_DISPLAY) as (keyof DebugDisplayOptions)[];
@@ -19,6 +21,7 @@ function defaults(): DebugPreferences {
     debugDisplay: { ...DEFAULT_DEBUG_DISPLAY },
     autoPlayLevel: null,
     historyRecording: false,
+    gameSpeed: 1,
   };
 }
 
@@ -32,6 +35,7 @@ export function loadDebugPreferences(): DebugPreferences {
     const preferences = defaults();
     if (typeof value.debug === 'boolean') preferences.debug = value.debug;
     if (typeof value.historyRecording === 'boolean') preferences.historyRecording = value.historyRecording;
+    if (GAME_SPEEDS.includes(value.gameSpeed as GameSpeed)) preferences.gameSpeed = value.gameSpeed as GameSpeed;
     if (value.autoPlayLevel === null || autoPlayLevels.includes(value.autoPlayLevel as AutoPlayLevel)) {
       preferences.autoPlayLevel = value.autoPlayLevel as AutoPlayLevel | null;
     }

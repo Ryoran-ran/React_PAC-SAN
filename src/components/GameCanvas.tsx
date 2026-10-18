@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { SoundEngine } from '../audio/SoundEngine';
 import { SCREEN_HEIGHT, SCREEN_WIDTH } from '../config/constants';
 import type { GameEngine } from '../engine/GameEngine';
-import { GameLoop } from '../engine/GameLoop';
+import { GameLoop, type GameSpeed } from '../engine/GameLoop';
 import { attachKeyboard } from '../input/KeyboardController';
 import { attachSwipe } from '../input/SwipeController';
 import { Renderer } from '../rendering/Renderer';
@@ -10,11 +10,12 @@ import { saveHighScore } from '../storage/highScore';
 
 type Snapshot = ReturnType<GameEngine['snapshot']>;
 
-export function GameCanvas({ engine, sound, onSnapshot }: {
-  engine: GameEngine; sound: SoundEngine; onSnapshot: (snapshot: Snapshot) => void;
+export function GameCanvas({ engine, sound, speed, onSnapshot }: {
+  engine: GameEngine; sound: SoundEngine; speed: GameSpeed; onSnapshot: (snapshot: Snapshot) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
+  const loopRef = useRef<GameLoop | null>(null);
   const [display, setDisplay] = useState({ scale: 1, pixelRatio: 1 });
   const [error, setError] = useState(false);
 
@@ -40,6 +41,7 @@ export function GameCanvas({ engine, sound, onSnapshot }: {
         lastSnapshotAt = now;
       }
     });
+    loopRef.current = loop;
     const detach = attachKeyboard(engine, window);
     const detachSwipe = attachSwipe(viewport, (direction) => {
       engine.requestDirection(direction);
@@ -53,11 +55,14 @@ export function GameCanvas({ engine, sound, onSnapshot }: {
     loop.start();
     return () => {
       loop.stop(); detach();
+      loopRef.current = null;
       detachSwipe();
       document.removeEventListener('visibilitychange', visibilityChange);
       if (engine.onSound === playSound) engine.onSound = null;
     };
   }, [engine, sound, onSnapshot]);
+
+  useEffect(() => { loopRef.current?.setSpeed(speed); }, [speed]);
 
   useEffect(() => {
     const viewport = viewportRef.current;

@@ -248,7 +248,7 @@ export class GameEngine {
             x: Math.floor(this.player.x / TILE_SIZE),
             y: Math.floor(this.player.y / TILE_SIZE),
           });
-          if (this.autoRecentCenters.length > 3) this.autoRecentCenters.shift();
+          if (this.autoRecentCenters.length > 12) this.autoRecentCenters.shift();
         }
       } else this.autoDecisionCenter = null;
     };

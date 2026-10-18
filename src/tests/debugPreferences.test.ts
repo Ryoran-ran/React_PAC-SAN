@@ -7,7 +7,7 @@ import {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('debug preference persistence', () => {
-  it('saves and restores debug, display, autoplay, and recording choices', () => {
+  it('saves and restores debug, display, autoplay, recording, and speed choices', () => {
     const values = new Map<string, string>();
     vi.stubGlobal('localStorage', {
       getItem: (key: string) => values.get(key) ?? null,
@@ -18,6 +18,7 @@ describe('debug preference persistence', () => {
       debugDisplay: { ...DEFAULT_DEBUG_DISPLAY, mazeGrid: false, ghostTargets: false },
       autoPlayLevel: 'tas' as const,
       historyRecording: true,
+      gameSpeed: 2 as const,
     };
 
     saveDebugPreferences(preferences);
@@ -31,6 +32,7 @@ describe('debug preference persistence', () => {
       debug: true,
       autoPlayLevel: 'unknown',
       historyRecording: 'yes',
+      gameSpeed: 1000,
       debugDisplay: { mazeGrid: false, ghostTargets: 'off', extra: false },
     }));
     vi.stubGlobal('localStorage', { getItem });
@@ -38,6 +40,7 @@ describe('debug preference persistence', () => {
       debug: true,
       autoPlayLevel: null,
       historyRecording: false,
+      gameSpeed: 1,
       debugDisplay: { ...DEFAULT_DEBUG_DISPLAY, mazeGrid: false },
     });
     getItem.mockReturnValue('not JSON');
@@ -45,6 +48,7 @@ describe('debug preference persistence', () => {
       debug: false,
       autoPlayLevel: null,
       historyRecording: false,
+      gameSpeed: 1,
       debugDisplay: DEFAULT_DEBUG_DISPLAY,
     });
   });

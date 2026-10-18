@@ -6,6 +6,7 @@ import { DebugPanel } from './components/DebugPanel';
 import { DebugDisplayControls } from './components/DebugDisplayControls';
 import { TOTAL_DOTS, type Direction } from './config/constants';
 import { GameEngine } from './engine/GameEngine';
+import type { GameSpeed } from './engine/GameLoop';
 import type { DebugDisplayKey } from './engine/DebugDisplay';
 import type { AutoPlayLevel } from './ai/AutoPlayer';
 import type { GameState } from './engine/GameState';
@@ -18,9 +19,10 @@ const STATE_LABELS: Record<GameState, string> = {
 };
 
 export default function App() {
+  const [initialPreferences] = useState(loadDebugPreferences);
   const [engine] = useState(() => {
     const game = new GameEngine(loadHighScore());
-    const preferences = loadDebugPreferences();
+    const preferences = initialPreferences;
     if (preferences.debug) game.toggleDebug();
     for (const key of Object.keys(preferences.debugDisplay) as DebugDisplayKey[]) {
       game.setDebugDisplayOption(key, preferences.debugDisplay[key]);
@@ -35,12 +37,14 @@ export default function App() {
   });
   const [sound] = useState(() => new SoundEngine(soundEnabled));
   const [snapshot, setSnapshot] = useState(() => engine.snapshot());
+  const [gameSpeed, setGameSpeed] = useState<GameSpeed>(initialPreferences.gameSpeed);
   const [mobileInfoOpen, setMobileInfoOpen] = useState(false);
   const storedDebugSettings = JSON.stringify({
     debug: snapshot.debug,
     debugDisplay: snapshot.debugDisplay,
     autoPlayLevel: snapshot.autoPlayLevel,
     historyRecording: snapshot.history.recording,
+    gameSpeed,
   });
   useEffect(() => {
     saveDebugPreferences({
@@ -48,6 +52,7 @@ export default function App() {
       debugDisplay: snapshot.debugDisplay,
       autoPlayLevel: snapshot.autoPlayLevel,
       historyRecording: snapshot.history.recording,
+      gameSpeed,
     });
   }, [storedDebugSettings]);
   const canPause = ['READY', 'PLAYING', 'PAUSED'].includes(snapshot.state);
@@ -109,7 +114,7 @@ export default function App() {
       <section className="arcade" aria-label="ゲーム画面">
         <div className="arcade-top"><span>{String(snapshot.level).padStart(2, '0')} <span className="muted">/ MAZE ACTION</span></span><span className="live-state"><i className={snapshot.state === 'PLAYING' ? 'active' : ''} />{STATE_LABELS[snapshot.state]}</span></div>
         <div className="screen-bezel">
-          <GameCanvas engine={engine} sound={sound} onSnapshot={setSnapshot} />
+          <GameCanvas engine={engine} sound={sound} speed={gameSpeed} onSnapshot={setSnapshot} />
           {snapshot.debug && <DebugDisplayControls display={snapshot.debugDisplay} onChange={changeDebugDisplay} />}
         </div>
         <div className="arcade-bottom"><span>224 × 288 <span className="muted">PX</span></span><span>60 <span className="muted">HZ</span></span><span className="muted">CANVAS 2D</span></div>
@@ -159,6 +164,8 @@ export default function App() {
         </section>
         <div className="phase-note"><span>DEVELOPMENT BUILD</span><p>Phase 3：恐怖・捕食、残機、フルーツ、面進行に対応。<br />細部の原作照合は今後進めます。</p></div>
         {snapshot.debug && <DebugPanel snapshot={snapshot}
+          gameSpeed={gameSpeed}
+          onGameSpeedChange={setGameSpeed}
           onAutoPlayChange={changeAutoPlay}
           onHistoryRecordingChange={changeHistoryRecording}
           onHistoryExport={exportHistory}

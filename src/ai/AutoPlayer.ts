@@ -323,6 +323,16 @@ function chooseTasDirection(player: PacSan, ghosts: readonly Ghost[], maze: Maze
     && previous.x === thirdPrevious.x && previous.y === thirdPrevious.y
     && beforePrevious.x === playerTile.x && beforePrevious.y === playerTile.y;
   const loopBackIndex = repeatedPair ? tileIndex(previous.x, previous.y) : -1;
+  const recentVisits = new Map<number, number>();
+  for (const center of recent) {
+    const index = tileIndex(center.x, center.y);
+    recentVisits.set(index, (recentVisits.get(index) ?? 0) + 1);
+  }
+  const recentTail = recent.slice(-8);
+  const circling = recentTail.length === 8
+    && new Set(recentTail.map(center => tileIndex(center.x, center.y))).size <= 4
+    && ghosts.some(ghost => ghost.houseState === 'OUTSIDE' && ghost.state === 'NORMAL'
+      && Math.hypot(ghost.x - player.x, ghost.y - player.y) < TILE_SIZE * 8);
 
   for (let depth = 0; depth < TAS_HORIZON_TILES; depth++) {
     const expanded: TasRoute[] = [];
@@ -344,6 +354,10 @@ function chooseTasDirection(player: PacSan, ghosts: readonly Ghost[], maze: Maze
         const backtrack = route.visited.has(neighbor.index) ? 4 : 0;
         const reverse = depth === 0 && neighbor.direction === OPPOSITE[player.direction] ? 1 : 0;
         const loopBack = depth === 0 && neighbor.index === loopBackIndex ? 20 : 0;
+        // A two-tile reversal is not the only way to get trapped. Prefer a
+        // different exit when a short circuit has already been traversed.
+        const recentRevisit = circling && depth === 0 && !dot
+          ? Math.min(3, recentVisits.get(neighbor.index) ?? 0) * 12 : 0;
         // The beam may score a route that starts with a detour and later
         // returns here. Replanning at that next tile otherwise repeats the
         // detour forever, so give the first step credit for approaching the
@@ -368,7 +382,7 @@ function chooseTasDirection(player: PacSan, ghosts: readonly Ghost[], maze: Maze
             ? dot === 'power' ? POWER_DOT_FREEZE_FRAMES : NORMAL_DOT_FREEZE_FRAMES : 0),
           score: route.score + reward + fruitReward + fruitProgress + huntProgress
             + committedProgress
-            - 1.5 - risk - backtrack - reverse - loopBack
+            - 1.5 - risk - backtrack - reverse - loopBack - recentRevisit
             - Math.min(120, staticThreat[neighbor.index]) * 0.035,
           firstDirection: route.firstDirection,
           target: fruitGoal && !route.fruitCollected ? fruitIndex
