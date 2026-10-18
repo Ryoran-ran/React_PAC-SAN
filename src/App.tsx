@@ -60,9 +60,16 @@ export default function App() {
   }, [storedDebugSettings]);
   const canPause = ['READY', 'PLAYING', 'PAUSED'].includes(snapshot.state);
   const canStart = snapshot.state === 'TITLE' || snapshot.state === 'GAME_OVER';
-  const showStartScreen = canStart && startScreenView !== 'prompt';
+  const showStartScreen = snapshot.state === 'TITLE' && startScreenView !== 'prompt';
   const startGame = () => {
     if (engine.state !== 'TITLE' && engine.state !== 'GAME_OVER') return;
+    if (engine.state === 'GAME_OVER') {
+      engine.start();
+      setStartScreenView('modes');
+      setMobileInfoOpen(false);
+      setSnapshot(engine.snapshot());
+      return;
+    }
     if (startScreenView === 'modes') {
       if (engine.selectedMode === 'freeplay') setStartScreenView('freeplay-settings');
       else {
@@ -85,7 +92,16 @@ export default function App() {
   };
   const changeStartMode = (mode: GameMode) => {
     engine.configureStart(mode);
-    setStartScreenView(mode === 'freeplay' ? 'freeplay-settings' : 'modes');
+    setStartScreenView('modes');
+    setSnapshot(engine.snapshot());
+  };
+  const activateStartMode = (mode: GameMode) => {
+    engine.configureStart(mode);
+    if (mode === 'freeplay') setStartScreenView('freeplay-settings');
+    else {
+      engine.showStartPrompt();
+      setStartScreenView('prompt');
+    }
     setSnapshot(engine.snapshot());
   };
   const changeFreePlaySettings = (settings: FreePlaySettings) => {
@@ -93,7 +109,8 @@ export default function App() {
     setSnapshot(engine.snapshot());
   };
   const returnToTitle = () => {
-    engine.returnToTitle();
+    if (engine.state === 'GAME_OVER') engine.showStartPrompt();
+    else engine.returnToTitle();
     setStartScreenView('modes');
     setMobileInfoOpen(false);
     setSnapshot(engine.snapshot());
@@ -172,7 +189,7 @@ export default function App() {
             aria-controls="mobile-info-panel" onClick={() => setMobileInfoOpen(!mobileInfoOpen)}>
             {mobileInfoOpen ? '情報を閉じる' : '情報を見る'}
           </button>
-          {snapshot.state === 'PAUSED' && <button className="mobile-title-button secondary-button"
+          {(snapshot.state === 'PAUSED' || snapshot.state === 'GAME_OVER') && <button className="mobile-title-button secondary-button"
             onClick={returnToTitle}>タイトルへ戻る</button>}
           {canStart && startScreenView === 'prompt' && <button className="mobile-title-button secondary-button"
             onClick={() => setStartScreenView('modes')}>モード選択へ戻る</button>}
@@ -195,7 +212,7 @@ export default function App() {
           <button className="primary-button" onClick={startGame} disabled={!canStart}>{snapshot.state === 'GAME_OVER' ? 'もう一度プレイ' : canStart ? 'ゲームをはじめる' : 'プレイ進行中'}<kbd>ENTER</kbd></button>
           {canStart && startScreenView === 'prompt' && <button className="secondary-button" onClick={() => setStartScreenView('modes')}>モード選択へ戻る</button>}
           <button className="secondary-button" onClick={() => engine.togglePause()} disabled={!canPause}>{snapshot.state === 'PAUSED' ? '▶ 再開する' : 'Ⅱ 一時停止'}<kbd>P / ESC</kbd></button>
-          {snapshot.state === 'PAUSED' && <button className="secondary-button return-title-button"
+          {(snapshot.state === 'PAUSED' || snapshot.state === 'GAME_OVER') && <button className="secondary-button return-title-button"
             onClick={returnToTitle}>タイトルへ戻る</button>}
         </div>
         <section className="controls" aria-label="操作方法"><h2>HOW TO PLAY</h2>
@@ -220,9 +237,9 @@ export default function App() {
           onClose={toggleDebug} />}
         </div>
       </aside>
-      {showStartScreen && <StartScreen gameOver={snapshot.state === 'GAME_OVER'} score={snapshot.score}
-        view={startScreenView} selectedMode={snapshot.selectedMode} settings={snapshot.freePlaySettings}
-        onModeChange={changeStartMode} onSettingsChange={changeFreePlaySettings}
+      {showStartScreen && <StartScreen view={startScreenView}
+        selectedMode={snapshot.selectedMode} settings={snapshot.freePlaySettings}
+        onModeActivate={activateStartMode} onSettingsChange={changeFreePlaySettings}
         onBack={() => setStartScreenView('modes')} onStart={startGame} />}
     </main>
     <footer className="site-footer"><span>PAC-SAN <span className="muted">/ パックサン</span></span><span>1980 ARCADE RECREATION <span className="footer-divider">·</span> v0.3.1</span></footer>

@@ -9,14 +9,12 @@ const GHOST_NAMES: readonly { id: GhostId; name: string }[] = [
   { id: 'clyde', name: 'グズタ' },
 ];
 
-export function StartScreen({ gameOver, score, view, selectedMode, settings, onModeChange,
+export function StartScreen({ view, selectedMode, settings, onModeActivate,
   onSettingsChange, onBack, onStart }: {
-  gameOver: boolean;
-  score: number;
   view: StartScreenView;
   selectedMode: GameMode;
   settings: FreePlaySettings;
-  onModeChange: (mode: GameMode) => void;
+  onModeActivate: (mode: GameMode) => void;
   onSettingsChange: (settings: FreePlaySettings) => void;
   onBack: () => void;
   onStart: () => void;
@@ -26,9 +24,8 @@ export function StartScreen({ gameOver, score, view, selectedMode, settings, onM
     <div className="start-intro">
       <div className="start-kicker"><span className="status-light" /> SELECT MODE / PAC-SAN</div>
       <div className="start-mark" aria-hidden="true"><span className="start-pac" /><i /><i /><i /><i /></div>
-      <h1 id="start-title">{configuring ? 'FREE PLAY' : gameOver ? 'GAME OVER' : 'PAC-SAN'}</h1>
-      <p>{configuring ? 'ラウンド・ゴーストの数・AIと行動を選択。'
-        : gameOver ? `SCORE ${String(score).padStart(6, '0')}` : '迷路の先へ。遊び方を選んでスタート。'}</p>
+      <h1 id="start-title">{configuring ? 'FREE PLAY' : 'PAC-SAN'}</h1>
+      {configuring && <p>ラウンド・ゴーストの数・AIと行動を選択。</p>}
       <div className="start-hint">{configuring
         ? 'Tab：設定と決定ボタン　·　Enter：盤面へ'
         : '↑ / ↓ / 1 2 3 / N：モード選択　·　Enter：盤面へ'}</div>
@@ -102,23 +99,23 @@ export function StartScreen({ gameOver, score, view, selectedMode, settings, onM
       <div className="mode-list" role="group" aria-label="ゲームモード">
         <button className={`mode-card${selectedMode === 'arcade' ? ' selected' : ''}`}
           type="button" aria-pressed={selectedMode === 'arcade'} onClick={(event) => {
-            onModeChange('arcade'); event.currentTarget.blur();
+            onModeActivate('arcade'); event.currentTarget.blur();
           }}>
-          <span className="mode-number">01</span><span className="mode-copy"><strong>アーケード</strong><small>3機から始める、いつものPAC-SAN</small></span>
+          <span className="mode-number">01</span><span className="mode-copy"><strong>ARCADE</strong><small>3機から始める、いつものPAC-SAN</small></span>
           <span className="mode-indicator" aria-hidden="true">{selectedMode === 'arcade' ? '●' : '○'}</span>
         </button>
         <button className={`mode-card${selectedMode === 'freeplay' ? ' selected' : ''}`}
           type="button" aria-pressed={selectedMode === 'freeplay'} onClick={(event) => {
-            onModeChange('freeplay'); event.currentTarget.blur();
+            onModeActivate('freeplay'); event.currentTarget.blur();
           }}>
-          <span className="mode-number">02</span><span className="mode-copy"><strong>フリープレイ</strong><small>残機無制限・ラウンドと敵の行動を設定</small></span>
+          <span className="mode-number">02</span><span className="mode-copy"><strong>FREE PLAY</strong><small>残機無制限・ラウンドと敵の行動を設定</small></span>
           <span className="mode-indicator" aria-hidden="true">{selectedMode === 'freeplay' ? '●' : '○'}</span>
         </button>
         <button className={`mode-card${selectedMode === 'nightmare' ? ' selected' : ''}`}
           type="button" aria-pressed={selectedMode === 'nightmare'} onClick={(event) => {
-            onModeChange('nightmare'); event.currentTarget.blur();
+            onModeActivate('nightmare'); event.currentTarget.blur();
           }}>
-          <span className="mode-number">03</span><span className="mode-copy"><strong>ナイトメア</strong><small>アーケードルール・4体が連携して追い詰める</small></span>
+          <span className="mode-number">03</span><span className="mode-copy"><strong>NIGHTMARE</strong><small>アーケードルール・4体が連携して追い詰める</small></span>
           <span className="mode-indicator" aria-hidden="true">{selectedMode === 'nightmare' ? '●' : '○'}</span>
         </button>
       </div>
