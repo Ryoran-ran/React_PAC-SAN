@@ -23,14 +23,15 @@ const REWARD_FIELDS: readonly {
   key: EvolutionRewardKey;
   label: string;
   description: string;
+  penalty?: boolean;
 }[] = [
   { key: 'dotProgress', label: 'ドット進行', description: '取得ドット1個ごとの加点' },
   { key: 'roundClear', label: 'ラウンド突破', description: '1面クリアごとの加点' },
   { key: 'activeRun', label: '生存', description: '評価終了時に生存していた加点' },
   { key: 'remainingLife', label: '残機', description: '残機1つごとの加点' },
-  { key: 'deathPenalty', label: 'ミス', description: '1ミスごとの減点' },
-  { key: 'gameOverPenalty', label: 'ゲームオーバー', description: 'ゲームオーバー時の追加減点' },
-  { key: 'stagnationPenalty', label: '停滞', description: '進行停滞で終了した場合の減点' },
+  { key: 'deathPenalty', label: 'ミス', description: '1ミスごとの減点', penalty: true },
+  { key: 'gameOverPenalty', label: 'ゲームオーバー', description: 'ゲームオーバー時の追加減点', penalty: true },
+  { key: 'stagnationPenalty', label: '停滞', description: '進行停滞で終了した場合の減点', penalty: true },
 ];
 
 const rewardSignature = (rewards: EvolutionRewardConfig) =>
@@ -156,14 +157,32 @@ function RewardSettings({ initialRewards, snapshot, paused, speed, onApply, onCl
         現在の世代は今の条件で最後まで評価し、変更は次世代から全個体へ適用します。
       </p>
       <div className="reward-fields">
-        {REWARD_FIELDS.map(({ key, label, description }) => {
+        {REWARD_FIELDS.map(({ key, label, description, penalty = false }) => {
           const [minimum, maximum, step] = EVOLUTION_REWARD_RANGES[key];
+          const displayedMinimum = penalty ? -maximum : minimum;
+          const displayedMaximum = penalty ? -minimum : maximum;
+          const displayedValue = penalty ? -draft[key] : draft[key];
+          const updateDisplayedValue = (value: number) => {
+            const clamped = Math.max(displayedMinimum, Math.min(displayedMaximum, value));
+            setDraft({ ...draft, [key]: penalty ? Math.abs(clamped) : clamped });
+          };
           return <label key={key}>
             <span><strong>{label}</strong><small>{description}</small></span>
-            <input type="number" min={minimum} max={maximum} step={step} value={draft[key]}
-              onChange={(event) => setDraft({ ...draft,
-                [key]: Math.max(minimum, Math.min(maximum, Number(event.target.value) || 0)),
-              })} />
+            <span className="reward-number-field">
+              <input type="number" min={displayedMinimum} max={displayedMaximum} step={step}
+                value={displayedValue}
+                onChange={(event) => updateDisplayedValue(Number(event.target.value) || 0)} />
+              <span className="reward-number-steps">
+                <button type="button" className="reward-step-up"
+                  aria-label={`${label}の数値を上げる`}
+                  disabled={displayedValue >= displayedMaximum}
+                  onClick={() => updateDisplayedValue(displayedValue + step)} />
+                <button type="button" className="reward-step-down"
+                  aria-label={`${label}の数値を下げる`}
+                  disabled={displayedValue <= displayedMinimum}
+                  onClick={() => updateDisplayedValue(displayedValue - step)} />
+              </span>
+            </span>
           </label>;
         })}
       </div>
@@ -368,7 +387,8 @@ export function TrainingLab({ onClose }: { onClose: () => void }) {
   const [snapshot, setSnapshot] = useState(() => trainer.snapshot());
   const [speed, setSpeed] = useState<TrainingSpeed>(4);
   const [paused, setPaused] = useState(false);
-  const [populationSize, setPopulationSize] = useState(trainer.population.length);
+  const [populationSize, setPopulationSize] = useState(
+    trainer.queuedPopulationSize ?? trainer.population.length);
   const [runUntilGeneration, setRunUntilGeneration] = useState<number | null>(null);
   const [savedChampion, setSavedChampion] = useState(loadSavedChampion);
   const [championView, setChampionView] = useState(false);
@@ -524,6 +544,13 @@ export function TrainingLab({ onClose }: { onClose: () => void }) {
     setRewardSettingsOpen(false);
   };
 
+  const changePopulationSize = (size: number) => {
+    if (!trainer.queuePopulationSize(size)) return;
+    setPopulationSize(size);
+    setSnapshot(trainer.snapshot());
+    setCheckpointInfo(saveTrainingCheckpoint(trainer));
+  };
+
   const importGenome = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = '';
@@ -675,8 +702,9 @@ export function TrainingLab({ onClose }: { onClose: () => void }) {
       </section>
 
       <section className="training-section training-setup">
-        <label>個体数<select value={populationSize}
-          onChange={(event) => setPopulationSize(Number(event.target.value))}>
+        <label>個体数{snapshot.pendingPopulationSize ? '（次世代）' : ''}<select
+          value={populationSize}
+          onChange={(event) => changePopulationSize(Number(event.target.value))}>
           {[8, 12, 16, 24].map((size) => <option key={size} value={size}>{size}体</option>)}
         </select></label>
         <button type="button" onClick={() => setCheckpointInfo(saveTrainingCheckpoint(trainer))}>
@@ -690,7 +718,7 @@ export function TrainingLab({ onClose }: { onClose: () => void }) {
         <p className="checkpoint-status">{checkpointInfo
           ? `✓ 世代 ${checkpointInfo.generation} を保存済み · 次回はこの個体群から自動再開${trainingSession.rewardMigrated && snapshot.history.length === 0 ? ' · 新報酬で再評価中' : ''}`
           : 'ブラウザー保存を利用できないため、このセッション内だけ学習します。'}</p>
-        <p>再開時は保存した世代の先頭から再評価します。各個体は2つの共通シードで評価し、上位2体を保存します。</p>
+        <p>個体数の変更は初期化せず次世代から反映します。再開時は保存した世代の先頭から、各個体を2つの共通シードで再評価します。</p>
       </section>
     </aside>
   </main>

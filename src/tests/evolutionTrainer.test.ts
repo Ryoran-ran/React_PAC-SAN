@@ -122,6 +122,39 @@ describe('genetic training', () => {
     expect(trainer.queueGenome({ dangerRadius: 99 })).toBe(false);
   });
 
+  it('changes the population size at the generation boundary without resetting learning', () => {
+    const trainer = new EvolutionTrainer({
+      populationSize: 8, maxFramesPerEpisode: 2, seeds: [8],
+    });
+
+    expect(trainer.queuePopulationSize(12)).toBe(true);
+    expect(trainer.population).toHaveLength(8);
+    expect(trainer.snapshot().pendingPopulationSize).toBe(12);
+    expect(trainer.createCheckpoint().pendingPopulationSize).toBe(12);
+
+    trainer.step();
+    expect(trainer.population).toHaveLength(8);
+    trainer.step();
+
+    expect(trainer.generation).toBe(2);
+    expect(trainer.population).toHaveLength(12);
+    expect(trainer.history).toHaveLength(1);
+    expect(trainer.bestEverGenome).not.toBeNull();
+    expect(trainer.snapshot().pendingPopulationSize).toBeNull();
+    expect(trainer.queuePopulationSize(3)).toBe(false);
+  });
+
+  it('restores a queued population-size change from a checkpoint', () => {
+    const trainer = new EvolutionTrainer({ populationSize: 8 });
+    trainer.queuePopulationSize(24);
+    const resumed = new EvolutionTrainer({ populationSize: 12 });
+
+    expect(resumed.restoreCheckpoint(trainer.createCheckpoint())).toBe(false);
+    expect(resumed.population).toHaveLength(8);
+    expect(resumed.queuedPopulationSize).toBe(24);
+    expect(resumed.snapshot().pendingPopulationSize).toBe(24);
+  });
+
   it('lets evolved danger genes change the selected route', () => {
     const player = new PacSan();
     player.x = at(6);

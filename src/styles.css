@@ -179,39 +179,55 @@ h2 { font: 10px/1.3 Consolas, monospace; letter-spacing: 1.5px; font-weight: 400
 .candidate-progress i { display: block; height: 100%; background: #50d7bd; }
 
 @media (min-width: 1500px) and (min-height: 760px) {
-  .training-lab.population-24 { grid-template-columns: minmax(0, 1fr) 310px; }
-  .training-lab.population-24 .training-stage { padding: 10px; }
-  .training-lab.population-24 .training-stage-heading { padding-bottom: 8px; }
-  .training-lab.population-24 .candidate-grid {
-    grid-template-columns: repeat(8, minmax(0, 1fr));
-    grid-template-rows: repeat(3, minmax(0, 1fr));
+  .training-lab.population-8 { --candidate-columns: 4; --candidate-rows: 2; }
+  .training-lab.population-12 { --candidate-columns: 6; --candidate-rows: 2; }
+  .training-lab.population-16 { --candidate-columns: 8; --candidate-rows: 2; }
+  .training-lab.population-24 { --candidate-columns: 8; --candidate-rows: 3; }
+  .training-lab:is(.population-8, .population-12, .population-16, .population-24) {
+    grid-template-columns: minmax(0, 1fr) 310px;
+  }
+  .training-lab:is(.population-8, .population-12, .population-16, .population-24) .training-stage {
+    padding: 10px;
+  }
+  .training-lab:is(.population-8, .population-12, .population-16, .population-24) .training-stage-heading {
+    padding-bottom: 8px;
+  }
+  .training-lab:is(.population-8, .population-12, .population-16, .population-24) .candidate-grid {
+    grid-template-columns: repeat(var(--candidate-columns), minmax(0, 1fr));
+    grid-template-rows: repeat(var(--candidate-rows), minmax(0, 1fr));
     align-content: stretch;
     gap: 6px;
     padding-right: 0;
     overflow: hidden;
   }
-  .training-lab.population-24 .candidate-card {
+  .training-lab:is(.population-8, .population-12, .population-16, .population-24) .candidate-card {
     min-height: 0;
     display: grid;
     grid-template-rows: auto minmax(0, 1fr) auto auto;
     padding: 4px;
   }
-  .training-lab.population-24 .candidate-card > header { padding-bottom: 3px; }
-  .training-lab.population-24 .candidate-card > footer { padding-top: 3px; }
-  .training-lab.population-24 .candidate-screen {
+  .training-lab:is(.population-8, .population-12, .population-16, .population-24) .candidate-card > header {
+    padding-bottom: 3px;
+  }
+  .training-lab:is(.population-8, .population-12, .population-16, .population-24) .candidate-card > footer {
+    padding-top: 3px;
+  }
+  .training-lab:is(.population-8, .population-12, .population-16, .population-24) .candidate-screen {
     min-height: 0;
     aspect-ratio: auto;
     display: flex;
     align-items: center;
     justify-content: center;
   }
-  .training-lab.population-24 .candidate-screen canvas {
+  .training-lab:is(.population-8, .population-12, .population-16, .population-24) .candidate-screen canvas {
     width: auto;
     height: 100%;
     max-width: 100%;
     object-fit: contain;
   }
-  .training-lab.population-24 .candidate-progress { margin-top: 3px; }
+  .training-lab:is(.population-8, .population-12, .population-16, .population-24) .candidate-progress {
+    margin-top: 3px;
+  }
   .training-lab.population-24 .training-controls {
     overflow: hidden;
     padding: 10px 11px;
@@ -233,6 +249,7 @@ h2 { font: 10px/1.3 Consolas, monospace; letter-spacing: 1.5px; font-weight: 400
   .training-lab.population-24 .genome-section dl { gap: 3px; margin-block: 5px; }
   .training-lab.population-24 .genome-section dl > div { padding: 3px; }
   .training-lab.population-24 .save-genome,
+  .training-lab.population-24 .import-genome,
   .training-lab.population-24 .training-setup button,
   .training-lab.population-24 .training-setup select { min-height: 27px; }
   .training-lab.population-24 .training-setup { gap: 4px; }
@@ -309,10 +326,22 @@ h2 { font: 10px/1.3 Consolas, monospace; letter-spacing: 1.5px; font-weight: 400
 .reward-settings-intro, .reward-settings-warning { margin: 11px 0; color: #81958f; font-size: 9px; line-height: 1.6; }
 .reward-fields { display: grid; gap: 5px; }
 .reward-fields label { display: grid; grid-template-columns: minmax(0, 1fr) 124px; align-items: center; gap: 14px; padding: 8px 9px; border: 1px solid #293c37; background: #131f1c; }
-.reward-fields label > span { min-width: 0; display: grid; gap: 2px; }
+.reward-fields label > span:first-child { min-width: 0; display: grid; gap: 2px; }
 .reward-fields label strong { color: #cfe0dc; font-size: 10px; font-weight: 500; }
 .reward-fields label small { overflow: hidden; color: #70847e; font-size: 8px; white-space: nowrap; text-overflow: ellipsis; }
-.reward-fields input { width: 100%; min-height: 31px; padding: 4px 7px; border: 1px solid #3b554f; border-radius: 3px; background: #0c1412; color: #7cf2da; font: 11px Consolas, monospace; text-align: right; }
+.reward-number-field { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) 24px; min-height: 31px; overflow: hidden; border: 1px solid #3b554f; border-radius: 3px; background: #0c1412; }
+.reward-fields .reward-number-field input { width: 100%; min-width: 0; padding: 4px 8px; border: 0; outline: 0; background: transparent; color: #7cf2da; font: 11px Consolas, monospace; text-align: right; appearance: textfield; -moz-appearance: textfield; }
+.reward-fields .reward-number-field input::-webkit-inner-spin-button,
+.reward-fields .reward-number-field input::-webkit-outer-spin-button { margin: 0; appearance: none; -webkit-appearance: none; }
+.reward-number-steps { display: grid; grid-template-rows: 1fr 1fr; border-left: 1px solid #3b554f; }
+.reward-number-steps button { position: relative; min-width: 0; min-height: 0; padding: 0; border: 0; background: #172722; }
+.reward-number-steps button:first-child { border-bottom: 1px solid #3b554f; }
+.reward-number-steps button:hover:enabled { background: #24463e; }
+.reward-number-steps button:disabled { opacity: .35; }
+.reward-number-steps button::before { content: ''; position: absolute; left: 50%; top: 50%; width: 0; height: 0; transform: translate(-50%, -50%); border-right: 4px solid transparent; border-left: 4px solid transparent; }
+.reward-number-steps .reward-step-up::before { border-bottom: 5px solid #7cf2da; }
+.reward-number-steps .reward-step-down::before { border-top: 5px solid #7cf2da; }
+.reward-number-field:focus-within { border-color: #50d7bd; box-shadow: 0 0 0 1px #50d7bd33; }
 .reward-settings-dialog > footer { display: grid; grid-template-columns: 1fr 1.35fr; gap: 7px; margin-top: 12px; }
 .reward-settings-dialog > footer button { min-height: 34px; border: 1px solid #3b554f; border-radius: 3px; background: #15231f; color: #bfd7d1; font-size: 9px; }
 .reward-settings-dialog > footer .reward-apply { border-color: #50d7bd; background: #1c3c35; color: #7cf2da; }
