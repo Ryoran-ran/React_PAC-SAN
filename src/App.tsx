@@ -235,7 +235,6 @@ export default function App() {
             <button onClick={toggleDebug} aria-label={`デバッグ表示を${snapshot.debug ? 'オフ' : 'オン'}にする`} aria-pressed={snapshot.debug}><kbd>F3</kbd><span>{snapshot.debug ? 'ON' : 'OFF'}</span></button>
           </div></div>
         </section>
-        <div className="phase-note"><span>DEVELOPMENT BUILD</span><p>Phase 3：恐怖・捕食、残機、フルーツ、面進行に対応。<br />細部の原作照合は今後進めます。</p></div>
         {snapshot.debug && <DebugPanel snapshot={snapshot}
           gameSpeed={gameSpeed}
           onGameSpeedChange={setGameSpeed}
@@ -250,7 +249,7 @@ export default function App() {
         onModeActivate={activateStartMode} onSettingsChange={changeFreePlaySettings}
         onBack={() => setStartScreenView('modes')} onStart={startGame} />}
     </main>}
-    <footer className="site-footer"><span>PAC-SAN <span className="muted">/ パックサン</span></span><span>1980 ARCADE RECREATION <span className="footer-divider">·</span> v0.3.1</span></footer>
+    <footer className="site-footer"><span>PAC-SAN <span className="muted">/ パックサン</span></span><span>1980 ARCADE RECREATION <span className="footer-divider">·</span> v0.4.0</span></footer>
     <div className="sr-only" role="status" aria-live="polite">{STATE_LABELS[snapshot.state]}</div>
     <div className="sr-only" role="status" aria-live="polite">{snapshot.fruitScorePopup ? `フルーツ獲得、${snapshot.fruitScorePopup.points}点` : ''}</div>
   </div>;
