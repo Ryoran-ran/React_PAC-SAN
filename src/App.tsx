@@ -5,6 +5,7 @@ import { FruitPickupHistory } from './components/FruitPickupHistory';
 import { DebugPanel } from './components/DebugPanel';
 import { DebugDisplayControls } from './components/DebugDisplayControls';
 import { StartScreen } from './components/StartScreen';
+import { TrainingLab } from './components/TrainingLab';
 import { TOTAL_DOTS, type Direction } from './config/constants';
 import { GameEngine } from './engine/GameEngine';
 import type { FreePlaySettings, GameMode } from './engine/GameModes';
@@ -41,6 +42,7 @@ export default function App() {
   const [snapshot, setSnapshot] = useState(() => engine.snapshot());
   const [gameSpeed, setGameSpeed] = useState<GameSpeed>(initialPreferences.gameSpeed);
   const [mobileInfoOpen, setMobileInfoOpen] = useState(false);
+  const [trainingOpen, setTrainingOpen] = useState(false);
   const [startScreenView, setStartScreenView] = useState<'modes' | 'freeplay-settings' | 'prompt'>('modes');
   const storedDebugSettings = JSON.stringify({
     debug: snapshot.debug,
@@ -161,13 +163,19 @@ export default function App() {
     catch { /* The setting still works for this session. */ }
   };
 
-  return <div className="app-shell">
+  return <div className={`app-shell${trainingOpen ? ' training-mode' : ''}`}>
     <header className="site-header">
       <a className="wordmark" href="./" aria-label="PAC-SAN ホーム"><span className="pac-mark" />PAC-SAN</a>
-      <div className="edition"><span className="status-light" />PHASE 03 <span>/</span> GAME SYSTEMS</div>
+      <div className="header-tools">
+        <div className="edition"><span className="status-light" />PHASE 03 <span>/</span> EVOLUTION LAB</div>
+        <button type="button" className={`lab-toggle${trainingOpen ? ' active' : ''}`}
+          onClick={() => setTrainingOpen(!trainingOpen)}>
+          {trainingOpen ? 'ARCADE' : 'AI TRAINING LAB'}
+        </button>
+      </div>
     </header>
 
-    <main className="game-layout">
+    {trainingOpen ? <TrainingLab onClose={() => setTrainingOpen(false)} /> : <main className="game-layout">
       <section className="arcade" aria-label="ゲーム画面" inert={showStartScreen}>
         <div className="arcade-top"><span>{String(snapshot.level).padStart(2, '0')} <span className="muted">/ {snapshot.gameMode === 'freeplay' ? snapshot.ghostAI === 'nightmare' ? 'FREE PLAY · NIGHTMARE' : 'FREE PLAY' : snapshot.gameMode === 'nightmare' ? 'NIGHTMARE' : 'ARCADE'}</span></span><span className="live-state"><i className={snapshot.state === 'PLAYING' ? 'active' : ''} />{STATE_LABELS[snapshot.state]}</span></div>
         <div className="screen-bezel">
@@ -227,7 +235,6 @@ export default function App() {
             <button onClick={toggleDebug} aria-label={`デバッグ表示を${snapshot.debug ? 'オフ' : 'オン'}にする`} aria-pressed={snapshot.debug}><kbd>F3</kbd><span>{snapshot.debug ? 'ON' : 'OFF'}</span></button>
           </div></div>
         </section>
-        <div className="phase-note"><span>DEVELOPMENT BUILD</span><p>Phase 3：恐怖・捕食、残機、フルーツ、面進行に対応。<br />細部の原作照合は今後進めます。</p></div>
         {snapshot.debug && <DebugPanel snapshot={snapshot}
           gameSpeed={gameSpeed}
           onGameSpeedChange={setGameSpeed}
@@ -241,8 +248,8 @@ export default function App() {
         selectedMode={snapshot.selectedMode} settings={snapshot.freePlaySettings}
         onModeActivate={activateStartMode} onSettingsChange={changeFreePlaySettings}
         onBack={() => setStartScreenView('modes')} onStart={startGame} />}
-    </main>
-    <footer className="site-footer"><span>PAC-SAN <span className="muted">/ パックサン</span></span><span>1980 ARCADE RECREATION <span className="footer-divider">·</span> v0.3.1</span></footer>
+    </main>}
+    <footer className="site-footer"><span>PAC-SAN <span className="muted">/ パックサン</span></span><span>1980 ARCADE RECREATION <span className="footer-divider">·</span> v0.4.0</span></footer>
     <div className="sr-only" role="status" aria-live="polite">{STATE_LABELS[snapshot.state]}</div>
     <div className="sr-only" role="status" aria-live="polite">{snapshot.fruitScorePopup ? `フルーツ獲得、${snapshot.fruitScorePopup.points}点` : ''}</div>
   </div>;

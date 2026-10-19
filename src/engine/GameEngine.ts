@@ -12,7 +12,8 @@ import { GhostHouse } from '../ai/GhostHouse';
 import { ModeScheduler } from '../ai/ModeScheduler';
 import { getGhostTarget } from '../ai/Targeting';
 import { chooseNightmareDirection, planNightmareTargets } from '../ai/NightmareAI';
-import { chooseAutoDirection, type AutoPlayLevel } from '../ai/AutoPlayer';
+import { chooseAutoDirection, chooseEvolutionDirection, type AutoPlayLevel,
+  type EvolutionGenome } from '../ai/AutoPlayer';
 import { Maze } from '../map/maze';
 import { moveGhost, movePlayer } from '../systems/MovementSystem';
 import { pointsForDot } from '../systems/ScoreSystem';
@@ -53,7 +54,7 @@ export class GameEngine {
   collectedFruits: FruitKind[] = [];
   fruitPickupCount = 0;
   fruitScorePopup: FruitScorePopup | null = null;
-  random = new GameRandom();
+  random: GameRandom;
   score = 0;
   highScore: number;
   level = 1;
@@ -70,6 +71,7 @@ export class GameEngine {
   debug = false;
   debugDisplay: DebugDisplayOptions = { ...DEFAULT_DEBUG_DISPLAY };
   autoPlayLevel: AutoPlayLevel | null = null;
+  evolutionGenome: EvolutionGenome | null = null;
   autoPlayTarget: { x: number; y: number } | null = null;
   onSound: ((cue: SoundCue) => void) | null = null;
   readonly history = new GameHistory();
@@ -77,8 +79,9 @@ export class GameEngine {
   private autoRecentCenters: { x: number; y: number }[] = [];
   private pausedFrom: 'READY' | 'PLAYING' = 'PLAYING';
 
-  constructor(highScore = 0) {
+  constructor(highScore = 0, randomSeed?: number) {
     this.highScore = highScore;
+    this.random = new GameRandom(randomSeed);
     this.fruit.reset(this.level);
   }
 
@@ -170,6 +173,7 @@ export class GameEngine {
   requestDirection(direction: Direction): void {
     if (this.state === 'READY' || this.state === 'PLAYING' || this.state === 'PAUSED') {
       this.setAutoPlayLevel(null);
+      this.setEvolutionGenome(null);
       this.player.requestedDirection = direction;
       this.history.recordEvent(this, 'manual_input', { direction });
     }
@@ -185,6 +189,14 @@ export class GameEngine {
     this.autoDecisionCenter = null;
     this.autoRecentCenters = [];
     if (level) this.player.requestedDirection = this.player.direction;
+  }
+
+  setEvolutionGenome(genome: EvolutionGenome | null): void {
+    this.evolutionGenome = genome;
+    this.autoPlayTarget = null;
+    this.autoDecisionCenter = null;
+    this.autoRecentCenters = [];
+    if (genome) this.player.requestedDirection = this.player.direction;
   }
 
   togglePause(): void {
@@ -273,11 +285,11 @@ export class GameEngine {
     this.fruit.tick();
 
     const decideAutoAtCenter = (): void => {
-      if (!this.autoPlayLevel) return;
+      if (!this.autoPlayLevel && !this.evolutionGenome) return;
       if (isAtTileCenter(this.player)) {
         const center = `${this.player.x},${this.player.y}`;
         if (center !== this.autoDecisionCenter) {
-          const decision = chooseAutoDirection(this.player, this.ghosts, this.maze, this.autoPlayLevel, {
+          const context = {
             round: this.level,
             nightmarePursuit: this.ghostAI === 'nightmare' && this.ghostBehavior !== 'scatter',
             frightenedFramesRemaining: this.frightenedFramesRemaining,
@@ -285,7 +297,11 @@ export class GameEngine {
             elroyStage: this.elroyStage,
             committedTarget: this.autoPlayLevel === 'tas' ? this.autoPlayTarget : null,
             recentCenters: this.autoRecentCenters,
-          });
+          };
+          const decision = this.evolutionGenome
+            ? chooseEvolutionDirection(this.player, this.ghosts, this.maze,
+              this.evolutionGenome, context)
+            : chooseAutoDirection(this.player, this.ghosts, this.maze, this.autoPlayLevel!, context);
           if (decision) {
             this.player.requestedDirection = decision.direction;
             this.autoPlayTarget = decision.target;

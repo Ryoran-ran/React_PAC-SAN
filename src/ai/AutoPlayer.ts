@@ -13,6 +13,32 @@ import { FRUIT_POSITION } from '../systems/FruitSystem';
 
 export type AutoPlayLevel = 'beginner' | 'standard' | 'expert' | 'tas';
 
+export interface EvolutionGenome {
+  readonly foodDistanceWeight: number;
+  readonly dangerRadius: number;
+  readonly dangerWeight: number;
+  readonly projectionTiles: number;
+  readonly clusterBonus: number;
+  readonly powerDotBias: number;
+  readonly fruitBias: number;
+  readonly reversePenalty: number;
+  readonly revisitPenalty: number;
+}
+
+export type EvolutionGene = keyof EvolutionGenome;
+
+export const EVOLUTION_GENE_RANGES: Record<EvolutionGene, readonly [number, number]> = {
+  foodDistanceWeight: [0.4, 2.2],
+  dangerRadius: [1, 5],
+  dangerWeight: [0.5, 9],
+  projectionTiles: [0, 4],
+  clusterBonus: [0, 1.2],
+  powerDotBias: [-8, 20],
+  fruitBias: [0, 20],
+  reversePenalty: [0, 12],
+  revisitPenalty: [0, 10],
+};
+
 interface Policy {
   readonly dangerRadius: number;
   readonly dangerWeight: number;
@@ -127,6 +153,96 @@ export interface TasContext {
   readonly elroyStage?: 0 | 1 | 2;
   readonly committedTarget?: TilePoint | null;
   readonly recentCenters?: readonly TilePoint[];
+}
+
+/** A compact, evolvable controller used by the training lab. */
+export function chooseEvolutionDirection(
+  player: PacSan,
+  ghosts: readonly Ghost[],
+  maze: Maze,
+  genome: EvolutionGenome,
+  context?: TasContext,
+): AutoPlayDecision | null {
+  const playerTile = tileOf(player);
+  const start = tileIndex(playerTile.x, playerTile.y);
+  if (!canPlayerEnter(playerTile.x, playerTile.y) || maze.remainingDots === 0) return null;
+
+  const policy: Policy = {
+    dangerRadius: Math.round(genome.dangerRadius),
+    dangerWeight: genome.dangerWeight,
+    projectionTiles: Math.round(genome.projectionTiles),
+    clusterBonus: genome.clusterBonus,
+  };
+  const threat = threatCosts(ghosts, policy);
+  const costs = Array<number>(TILE_COUNT).fill(Number.POSITIVE_INFINITY);
+  const firstDirections = Array<Direction | null>(TILE_COUNT).fill(null);
+  const visited = Array<boolean>(TILE_COUNT).fill(false);
+  costs[start] = 0;
+
+  for (let count = 0; count < TILE_COUNT; count++) {
+    let current = -1;
+    for (let index = 0; index < TILE_COUNT; index++) {
+      if (!visited[index] && costs[index] < Number.POSITIVE_INFINITY
+          && (current < 0 || costs[index] < costs[current])) current = index;
+    }
+    if (current < 0) break;
+    visited[current] = true;
+    for (const neighbor of neighbors(current)) {
+      const nextCost = costs[current] + genome.foodDistanceWeight + threat[neighbor.index];
+      if (nextCost >= costs[neighbor.index]) continue;
+      costs[neighbor.index] = nextCost;
+      firstDirections[neighbor.index] = firstDirections[current] ?? neighbor.direction;
+    }
+  }
+
+  const recentVisits = new Map<number, number>();
+  for (const center of context?.recentCenters ?? []) {
+    const index = tileIndex(center.x, center.y);
+    recentVisits.set(index, (recentVisits.get(index) ?? 0) + 1);
+  }
+  const firstStepByDirection = new Map(neighbors(start)
+    .map((neighbor) => [neighbor.direction, neighbor.index] as const));
+  const directionPenalty = (direction: Direction): number => {
+    const reverse = direction === OPPOSITE[player.direction] ? genome.reversePenalty : 0;
+    const firstStep = firstStepByDirection.get(direction);
+    const revisits = firstStep === undefined ? 0 : recentVisits.get(firstStep) ?? 0;
+    return reverse + revisits * genome.revisitPenalty;
+  };
+
+  let bestIndex = -1;
+  let bestScore = Number.POSITIVE_INFINITY;
+  for (const [index, dot] of maze.dots) {
+    const direction = firstDirections[index];
+    if (index === start || !direction) continue;
+    const score = costs[index]
+      - genome.clusterBonus * nearbyDotCount(index, maze.dots)
+      - (dot === 'power' ? genome.powerDotBias : 0)
+      + directionPenalty(direction);
+    if (score < bestScore || (score === bestScore && index < bestIndex)) {
+      bestIndex = index;
+      bestScore = score;
+    }
+  }
+
+  if (context?.fruit?.visible) {
+    const fruitIndex = tileIndex(Math.floor(FRUIT_POSITION.x / TILE_SIZE),
+      Math.floor(FRUIT_POSITION.y / TILE_SIZE));
+    const direction = firstDirections[fruitIndex];
+    if (direction) {
+      const fruitScore = costs[fruitIndex] + directionPenalty(direction)
+        - genome.fruitBias * Math.max(1, context.fruit.points / 100);
+      if (fruitScore < bestScore) {
+        bestIndex = fruitIndex;
+        bestScore = fruitScore;
+      }
+    }
+  }
+
+  if (bestIndex < 0) return null;
+  return {
+    direction: firstDirections[bestIndex]!,
+    target: { x: bestIndex % MAZE_COLUMNS, y: Math.floor(bestIndex / MAZE_COLUMNS) },
+  };
 }
 
 interface ForecastGhost {
