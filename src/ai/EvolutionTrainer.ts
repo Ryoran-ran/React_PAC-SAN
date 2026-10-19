@@ -99,6 +99,7 @@ export interface EvolutionCheckpoint {
   readonly rewards?: EvolutionRewardConfig;
   readonly pendingRewards?: EvolutionRewardConfig | null;
   readonly pendingGenome?: EvolutionGenome | null;
+  readonly pendingPopulationSize?: number | null;
 }
 
 export interface EvolutionCandidate {
@@ -129,6 +130,7 @@ export interface EvolutionTrainerSnapshot {
   readonly rewards: EvolutionRewardConfig;
   readonly pendingRewards: EvolutionRewardConfig | null;
   readonly pendingGenome: boolean;
+  readonly pendingPopulationSize: number | null;
   readonly history: readonly GenerationResult[];
   readonly candidates: readonly {
     id: number;
@@ -179,6 +181,7 @@ export class EvolutionTrainer {
   private rewards: EvolutionRewardConfig;
   private pendingRewards: EvolutionRewardConfig | null = null;
   private pendingGenome: EvolutionGenome | null = null;
+  private pendingPopulationSize: number | null = null;
   private random = new EvolutionRandom();
 
   constructor(options: EvolutionTrainerOptions = {}) {
@@ -198,6 +201,7 @@ export class EvolutionTrainer {
     return this.pendingRewards ? { ...this.pendingRewards } : null;
   }
   get hasQueuedGenome(): boolean { return this.pendingGenome !== null; }
+  get queuedPopulationSize(): number | null { return this.pendingPopulationSize; }
 
   queueRewards(rewards: EvolutionRewardConfig): boolean {
     if (!this.isValidRewards(rewards)) return false;
@@ -211,6 +215,12 @@ export class EvolutionTrainer {
     return true;
   }
 
+  queuePopulationSize(populationSize: number): boolean {
+    if (!Number.isSafeInteger(populationSize) || populationSize < 4) return false;
+    this.pendingPopulationSize = populationSize === this.populationSize ? null : populationSize;
+    return true;
+  }
+
   reset(populationSize = this.populationSize): void {
     this.populationSize = Math.max(4, Math.round(populationSize));
     this.generation = 1;
@@ -219,6 +229,7 @@ export class EvolutionTrainer {
     this.bestEverGenome = null;
     this.pendingRewards = null;
     this.pendingGenome = null;
+    this.pendingPopulationSize = null;
     this.random = new EvolutionRandom();
     this.population = Array.from({ length: this.populationSize }, (_, index) =>
       this.createCandidate(index + 1, this.randomGenome()));
@@ -238,6 +249,7 @@ export class EvolutionTrainer {
       rewards: { ...this.rewards },
       pendingRewards: this.pendingRewards ? { ...this.pendingRewards } : null,
       pendingGenome: this.pendingGenome ? { ...this.pendingGenome } : null,
+      pendingPopulationSize: this.pendingPopulationSize,
     };
   }
 
@@ -258,6 +270,10 @@ export class EvolutionTrainer {
         && !this.isValidRewards(checkpoint.pendingRewards))
       || (checkpoint.pendingGenome !== undefined && checkpoint.pendingGenome !== null
         && !this.isValidGenome(checkpoint.pendingGenome))
+      || (checkpoint.pendingPopulationSize !== undefined
+        && checkpoint.pendingPopulationSize !== null
+        && (!Number.isSafeInteger(checkpoint.pendingPopulationSize)
+          || checkpoint.pendingPopulationSize < 4))
       || (checkpoint.bestEverGenome !== null
         && !this.isValidGenome(checkpoint.bestEverGenome))) {
       throw new Error('Invalid evolution checkpoint.');
@@ -273,6 +289,7 @@ export class EvolutionTrainer {
     this.rewards = { ...(checkpoint.rewards ?? EVOLUTION_REWARDS) };
     this.pendingRewards = checkpoint.pendingRewards ? { ...checkpoint.pendingRewards } : null;
     this.pendingGenome = checkpoint.pendingGenome ? { ...checkpoint.pendingGenome } : null;
+    this.pendingPopulationSize = checkpoint.pendingPopulationSize ?? null;
     this.random = new EvolutionRandom(checkpoint.randomState);
     this.population = checkpoint.population.map((genome, index) =>
       this.createCandidate(index + 1, { ...genome }));
@@ -299,6 +316,7 @@ export class EvolutionTrainer {
       rewards: { ...this.rewards },
       pendingRewards: this.pendingRewards ? { ...this.pendingRewards } : null,
       pendingGenome: this.pendingGenome !== null,
+      pendingPopulationSize: this.pendingPopulationSize,
       history: [...this.history],
       candidates: this.population.map((candidate, index) => ({
         id: candidate.id,
@@ -389,17 +407,20 @@ export class EvolutionTrainer {
       this.bestEverGenome = { ...best.genome };
     }
 
-    let genomes: EvolutionGenome[] = ranked.slice(0, this.eliteCount)
+    const nextPopulationSize = this.pendingPopulationSize ?? this.populationSize;
+    let genomes: EvolutionGenome[] = ranked.slice(0, Math.min(this.eliteCount, nextPopulationSize))
       .map((candidate) => ({ ...candidate.genome }));
     if (this.pendingGenome) {
-      genomes = [{ ...this.pendingGenome }, ...genomes].slice(0, this.populationSize);
+      genomes = [{ ...this.pendingGenome }, ...genomes].slice(0, nextPopulationSize);
       this.pendingGenome = null;
     }
-    while (genomes.length < this.populationSize) {
+    while (genomes.length < nextPopulationSize) {
       const first = this.tournament(ranked).genome;
       const second = this.tournament(ranked).genome;
       genomes.push(this.mutate(this.crossover(first, second)));
     }
+    this.populationSize = nextPopulationSize;
+    this.pendingPopulationSize = null;
     this.generation++;
     if (this.pendingRewards) {
       this.rewards = { ...this.pendingRewards };
